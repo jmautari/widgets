@@ -220,6 +220,10 @@ Once the system is rebooted Chromium should be opened in fullscreen. If somethin
 
 **Note:** instructions valid for Raspian.
 
+## Troubleshooting
+
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+
 ## Acknowledgments
 
 Built with
