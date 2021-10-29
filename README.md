@@ -1,6 +1,6 @@
 # Widgets
 
-A simple client/server app to render widgets defined by a remote JSON file onto a web browser page.
+A simple client/server app to render widgets defined by a JSON file onto a web browser page.
 
 Client (JS) and Server (Node.js) included, see `/path/to/repo/client` and `/path/to/repo/server`
 
