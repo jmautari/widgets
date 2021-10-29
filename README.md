@@ -6,7 +6,7 @@ Client (JS) and Server (Node.js) included, see `/path/to/repo/client` and `/path
 
 Can be used on any device that can run a modern web browser.
 Created to make easier to update remote LCD screens connected to an Raspberry Pi 4 Model B (see demo video below)
-but can be used with regular monitors on any device, including smartphones and tablets.
+but can be used with regular monitor(s) on any device, including smartphones and tablets.
 
 ## Demo
 
