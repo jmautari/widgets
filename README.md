@@ -201,19 +201,13 @@ $ sudo nano /etc/xdg/lxsession/LXDE-pi/autostart
 ```
 
 ```
-chromium-browser --new-window --incognito \
-  --start-fullscreen --window-position=0,0 \
-  --noerrdialogs --user-data-dir=/tmp/screen-1 \
-  --app=http://YOUR-PC-NAME:3000/index.html?screen=0 &
+chromium-browser --new-window --incognito --start-fullscreen --window-position=0,0 --noerrdialogs --user-data-dir=/tmp/screen-1 --app=http://YOUR-PC-NAME:3000/index.html?screen=0 &
 ```
 
 If you have two screens connected to the Raspberry Pi, add another line as follows (modify the `--window-position` values to match your primary screen width)
 
 ```
-chromium-browser --new-window --incognito \
-  --start-fullscreen --window-position=800,0 \
-  --noerrdialogs --user-data-dir=/tmp/screen-2 \
-  --app=http://YOUR-PC-NAME:3000/index.html?screen=1 &
+chromium-browser --new-window --incognito --start-fullscreen --window-position=800,0 --noerrdialogs --user-data-dir=/tmp/screen-2 --app=http://YOUR-PC-NAME:3000/index.html?screen=1 &
 ```
 
 Press `CTRL+X` `Y` to save your changes.
