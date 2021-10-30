@@ -106,8 +106,8 @@ const saveFile = (cmd, server, params) => {
     if (!params.overwrite) {
       // Add to list
       addToList(params.filename);
+      onFileSaved(params.filename, server);
     }
-    onFileSaved(params.filename, server);
     sendResponse(cmd, 200, server);
   } catch(err) {
     sendResponse(cmd, 500, server);
