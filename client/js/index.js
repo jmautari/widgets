@@ -90,13 +90,6 @@ const createWidget = (o) => {
   }
   return getImageTag(o);
 };
-const encodeHtml = (s) => {
-  return s.replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/'/g, '&#39;')
-    .replace(/"/g, '&#34;');
-};
 const connect = () => {
   try {
     const ws = new WebSocket(websocketUrl);
@@ -123,8 +116,9 @@ const connect = () => {
           if (i.screen === screen)
             html += createWidget(i);
         });
-        if (encodeHtml(html) !== widgetData) {
-          container.setAttribute(kWidgetData, encodeHtml(html));
+        const htmlEncoded = Utils.encodeHtml(html);
+        if (htmlEncoded !== widgetData) {
+          container.setAttribute(kWidgetData, htmlEncoded);
           container.innerHTML = html;
         }
       }
@@ -144,20 +138,11 @@ const start = () => {
   clearTimer();
   reconnectTimer = window.setInterval(reconnect, kRetryIntervalMs);
 };
-const bootLoader = () => {
-  let head = document.head;
-  let script = document.createElement('script');
-  script.type = 'text/javascript';
-  script.src = 'js/config.js';
-  script.onload = () => {
-    hostName = config.host || 'mr-pc';
-    port = config.port || 3000;
-    host = hostName + ':' + port;
-    websocketUrl = 'ws://' + host;
+bootLoader(() => {
+  hostName = config.host || 'mr-pc';
+  port = config.port || 3000;
+  host = hostName + ':' + port;
+  websocketUrl = 'ws://' + host;
 
-    start();
-  };
-  head.appendChild(script);
-};
-
-bootLoader();
+  start();
+});
