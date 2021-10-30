@@ -182,6 +182,12 @@ Supports video files (`.mp4`), images in general (`.gif*` `.jpg` `.png` etc.) an
 
 * `.gif` is not supported on Safari.
 
+## Editing, copying and switching between widget configuration profiles
+
+Open `http://YOUR-PC-NAME:3000/admin/` in a browser tab to access a web-based tool that allows quick editing, copying and switching between your widget configuration profiles.
+
+https://user-images.githubusercontent.com/5205328/139523342-f8864793-be65-4ef3-8346-abf27701e266.mp4
+
 ## Setting up Chromium to open fullscreen when the Raspberry Pi is booted
 
 Open a SSH connection to your Raspberry Pi and add the following lines to the bottom of `/etc/xdg/lxsession/LXDE-pi/autostart` file
