@@ -10,6 +10,8 @@ but can be used with regular monitor(s) on any device, including smartphones and
 
 ## Demo
 
+In the video below the two LCD screens inside the Lian Li O11 Dynamic XL case are connected to a Raspberry Pi 4 Model B.
+
 https://user-images.githubusercontent.com/5205328/139351061-a6285647-3ab3-464b-9ac7-f99a53fed95d.mp4
 
 ## Requirements
@@ -185,6 +187,8 @@ Supports video files (`.mp4`), images in general (`.gif*` `.jpg` `.png` etc.) an
 ## Editing, copying and switching between widget configuration profiles
 
 Open `http://YOUR-PC-NAME:3000/admin/` in a browser tab to access a web-based tool that allows quick editing, copying and switching between your widget configuration profiles.
+
+In the video below the two LCD screens inside the Lian Li O11 Dynamic XL case are connected to a Raspberry Pi 4 Model B.
 
 https://user-images.githubusercontent.com/5205328/139523342-f8864793-be65-4ef3-8346-abf27701e266.mp4
 
