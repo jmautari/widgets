@@ -241,13 +241,12 @@ app.get('/sensors', (req, res) => {
     context.textBaseline = 'top';
     context.font = 'bold ' + fontSize + 'pt ' + fontName;
     context.textAlign = align;
-    const textWidth = align === 'left' ? 0 : context.measureText(val).width;
     if (shadowColor) {
       context.fillStyle = '#' + shadowColor;
-      context.fillText(val, x - textWidth + 4, y + 4, w);
+      context.fillText(val, x + 4, y + 4, w);
     }
     context.fillStyle = '#' + color;
-    context.fillText(val, x - textWidth, y, w);
+    context.fillText(val, x, y, w);
     res.setHeader('content-type', 'image/png');
     res.send(canvas.toBuffer('image/png'));
   } catch(err) {
@@ -263,6 +262,8 @@ app.get('/text', (req, res) => {
   const align = req.query.align || 'left';
   const w = parseInt(req.query.w || 480);
   const h = parseInt(req.query.h || 480);
+  let x = align === 'left' ? 0 : align === 'center' ? w / 2 : w;
+  const y = 0;
   try {
     const canvas = createCanvas(w, h);
     const context = canvas.getContext('2d');
@@ -272,10 +273,10 @@ app.get('/text', (req, res) => {
     context.textAlign = align;
     if (shadowColor) {
       context.fillStyle = '#' + shadowColor;
-      context.fillText(text, 4, 4, w);
+      context.fillText(text, x + 4, 4, w);
     }
     context.fillStyle = '#' + color;
-    context.fillText(text, 0, 0, w);
+    context.fillText(text, x, 0, w);
     res.setHeader('content-type', 'image/png');
     res.send(canvas.toBuffer('image/png'));
   } catch (err) {
@@ -295,6 +296,7 @@ app.get('/gauge', (req, res) => {
   const sensor = req.query.sensor;
   const value = req.query.value;
   const color = req.query.color || 'fff';
+  const dotted = parseInt(req.query.dotted || 0);
   const angle = 1.0 - ((req.query.startangle || 360.0) / 360.0);
   const max = req.query.max || 1000;
   const w = parseInt(req.query.w || 480);
@@ -325,14 +327,16 @@ app.get('/gauge', (req, res) => {
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = outerWidth;
     ctx.stroke();
-    if (true) {
-      ctx.beginPath();
-      ctx.arc(cx, cy, size, cc ? PI - startAngle : startAngle, cc ? PI - endPercentAngle : endPercentAngle);
-      ctx.strokeStyle = '#' + color;
-      ctx.lineWidth = innerWidth;
-      //ctx.setLineDash([1, 4]);
-      ctx.stroke();
+
+    ctx.beginPath();
+    ctx.globalAlpha = 1.0;
+    ctx.arc(cx, cy, size, cc ? PI - startAngle : startAngle, cc ? PI - endPercentAngle : endPercentAngle);
+    ctx.strokeStyle = '#' + color;
+    ctx.lineWidth = innerWidth;
+    if (dotted) {
+      ctx.setLineDash([2, 4]);
     }
+    ctx.stroke();
     res.setHeader('content-type', 'image/png');
     res.send(canvas.toBuffer('image/png'));
   } catch (err) {
