@@ -1,12 +1,14 @@
 const express = require('express');
 const fs = require('fs');
 const ws = require('ws');
-const msgHandler = require('./lib/message_handler')
+const { createCanvas } = require('canvas');
+const msgHandler = require('./lib/message_handler');
 const app = express();
 const port = process.env.PW_PORT || 3000;
 const kJsonFile = 'widgets.json';
 const kDefaultJsonFile = 'widgets_default.json';
 const kListFile = 'widgets_list.json';
+const kSensorsFile = 'sensors.json';
 const kRootDir = process.env.PW_ROOT || 'd:/backgrounds';
 
 const kCmdWidgets = 'widgets';
@@ -208,6 +210,134 @@ msgHandler.on(kCmdActivateFile,
   });
 app.get('/', (req, res) => {
   res.send('Page Watch')
+});
+app.get('/sensors', (req, res) => {
+  const filename = kRootDir + '/' + kSensorsFile;
+  if (!fs.existsSync(filename)) {
+    res.sendStatus(404);
+    return;
+  }
+  const sensor = req.query.sensor;
+  const value = req.query.value;
+  const color = req.query.color || 'fff';
+  const shadowColor = req.query.shadowcolor || undefined;
+  const size = req.query.size || 32;
+  const fontName = req.query.fontname || 'Consolas';
+  const align = req.query.align || 'left';
+  const type = req.query.type || 'str';
+  const w = parseInt(req.query.w || 480);
+  const h = parseInt(req.query.h || 480);
+  let x = align === 'left' ? 0 : align === 'center' ? w / 2 : w;
+  const y = 0;
+  try {
+    const json = JSON.parse(fs.readFileSync(filename));
+    let val = json.sensors[sensor][value];
+    const canvas = createCanvas(w, h);
+    const context = canvas.getContext('2d');
+    const fontSize = parseInt(size) * 2;
+    if (type === 'int') {
+      val = parseInt(val);
+    }
+    context.textBaseline = 'top';
+    context.font = 'bold ' + fontSize + 'pt ' + fontName;
+    context.textAlign = align;
+    const textWidth = align === 'left' ? 0 : context.measureText(val).width;
+    if (shadowColor) {
+      context.fillStyle = '#' + shadowColor;
+      context.fillText(val, x - textWidth + 4, y + 4, w);
+    }
+    context.fillStyle = '#' + color;
+    context.fillText(val, x - textWidth, y, w);
+    res.setHeader('content-type', 'image/png');
+    res.send(canvas.toBuffer('image/png'));
+  } catch(err) {
+    res.send('Error');
+  }
+});
+app.get('/text', (req, res) => {
+  const text = req.query.text || 'Text here';
+  const color = req.query.color || 'fff';
+  const shadowColor = req.query.shadowcolor || undefined;
+  const size = req.query.size || 32;
+  const fontName = req.query.fontname || 'Consolas';
+  const align = req.query.align || 'left';
+  const w = parseInt(req.query.w || 480);
+  const h = parseInt(req.query.h || 480);
+  try {
+    const canvas = createCanvas(w, h);
+    const context = canvas.getContext('2d');
+    const fontSize = parseInt(size) * 2;
+    context.textBaseline = 'top';
+    context.font = 'bold ' + fontSize + 'pt ' + fontName;
+    context.textAlign = align;
+    if (shadowColor) {
+      context.fillStyle = '#' + shadowColor;
+      context.fillText(text, 4, 4, w);
+    }
+    context.fillStyle = '#' + color;
+    context.fillText(text, 0, 0, w);
+    res.setHeader('content-type', 'image/png');
+    res.send(canvas.toBuffer('image/png'));
+  } catch (err) {
+    res.send('Error');
+  }
+});
+app.get('/gauge', (req, res) => {
+  const filename = kRootDir + '/' + kSensorsFile;
+  if (!fs.existsSync(filename)) {
+    res.sendStatus(404);
+    return;
+  }
+  const PI = Math.PI;
+  const PI2 = PI * 2;
+  const outerWidth = 30;
+  const innerWidth = 20;
+  const sensor = req.query.sensor;
+  const value = req.query.value;
+  const color = req.query.color || 'fff';
+  const angle = 1.0 - ((req.query.startangle || 360.0) / 360.0);
+  const max = req.query.max || 1000;
+  const w = parseInt(req.query.w || 480);
+  const h = parseInt(req.query.h || 480);
+  const cc = parseInt(req.query.cc || 0);  // counter clockwise?
+  const cx = w / 2 + 4;
+  const cy = h / 2;
+  const size = cx - 2 * (outerWidth - innerWidth);
+  try {
+    const json = JSON.parse(fs.readFileSync(filename));
+    let val = json.sensors[sensor][value];
+    const canvas = createCanvas(w, h);
+    const ctx = canvas.getContext('2d');
+    ctx.globalAlpha = 0.6;
+    val = parseInt(val);
+    if (val > max) {
+      val = max;
+    }
+    const percent = val * 100 / max;
+    const endAngle = PI2 + PI * (1.0 - angle);
+    const startAngle = angle * PI;
+    const endPercentAngle = !cc ?
+      startAngle + (endAngle - startAngle) * percent / 100 :
+      startAngle - (endAngle - startAngle) * percent / 100;
+    //console.log('size=%d startAngle=%f endAngle=%f endPercentAngle=%f val=%f', size, startAngle, endAngle, endPercentAngle, val);
+    ctx.beginPath();
+    ctx.arc(cx, cy, size, cc ? PI - startAngle : startAngle, cc ? PI - endAngle : endAngle);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = outerWidth;
+    ctx.stroke();
+    if (true) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, size, cc ? PI - startAngle : startAngle, cc ? PI - endPercentAngle : endPercentAngle);
+      ctx.strokeStyle = '#' + color;
+      ctx.lineWidth = innerWidth;
+      //ctx.setLineDash([1, 4]);
+      ctx.stroke();
+    }
+    res.setHeader('content-type', 'image/png');
+    res.send(canvas.toBuffer('image/png'));
+  } catch (err) {
+    res.send('Error');
+  }
 });
 
 const server = app.listen(port, () => {

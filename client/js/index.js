@@ -79,7 +79,9 @@ const getYoutubeTag = (o, share) => {
 const getImageTag = (o) => {
   // Assume image if not handled.
   const uri = '//' + host + '/' + o.uri;
-  return '<img src="' + uri + '" style="' + getPosCSS(o.position) + '">';
+  const updateInterval = o.update || 0;
+  return '<img src="' + uri + '" style="' + getPosCSS(o.position) +
+    '" update-interval="' + updateInterval + '">';
 };
 const createWidget = (o) => {
   const type = getType(o.uri);
@@ -89,6 +91,54 @@ const createWidget = (o) => {
     return getYoutubeTag(o, type === kYoutubeShare);
   }
   return getImageTag(o);
+};
+const startUpdater = () => {
+  const img = document.getElementsByTagName('img');
+  const list = Array.prototype.slice.call(img);
+  if (list.length === 0)
+    return;
+  list.forEach(i => {
+    const interval = parseInt(i.getAttribute('update-interval'));
+    if (interval > 0) {
+      i.setAttribute('update-active', 'true');
+      let source = i.getAttribute('data-source');
+      if (!source) {
+        source = i.src;
+        i.setAttribute('data-source', source);
+        i.addEventListener('load', () => {
+          setTimeout(() => {
+            if (i.getAttribute('update-active') === 'true') {
+              const u = i.getAttribute('data-source') + '&t=' + Date.now();
+              i.src = u;
+            }
+          }, interval);
+        });
+        i.addEventListener('error', () => {
+          if (i.getAttribute('update-active') === 'true') {
+            console.log('Erro loading image. Retrying');
+            setTimeout(() => {
+              if (i.getAttribute('update-active') === 'true') {
+                const u = i.getAttribute('data-source') + '&t=' + Date.now();
+                i.src = u;
+              }
+            }, interval);
+          }
+        });
+      }
+    }
+  });
+};
+const stopUpdater = () => {
+  const img = document.getElementsByTagName('img');
+  const list = Array.prototype.slice.call(img);
+  if (list.length === 0)
+    return;
+  list.forEach(i => {
+    const interval = parseInt(i.getAttribute('update-interval'));
+    if (interval > 0) {
+      i.setAttribute('update-active', 'false');
+    }
+  });
 };
 const connect = () => {
   try {
@@ -113,13 +163,16 @@ const connect = () => {
         const widgetData = container.getAttribute(kWidgetData);
         const screen = getScreen();
         data.widgets.map(i => {
-          if (i.screen === screen)
+          if (i.screen === screen) {
             html += createWidget(i);
+          }
         });
         const htmlEncoded = Utils.encodeHtml(html);
         if (htmlEncoded !== widgetData) {
+          stopUpdater();
           container.setAttribute(kWidgetData, htmlEncoded);
           container.innerHTML = html;
+          startUpdater();
         }
       }
     };
