@@ -310,7 +310,7 @@ app.get('/gauge', (req, res) => {
     let val = json.sensors[sensor][value];
     const canvas = createCanvas(w, h);
     const ctx = canvas.getContext('2d');
-    ctx.globalAlpha = 0.6;
+    ctx.globalAlpha = 0.5;
     val = parseInt(val);
     if (val > max) {
       val = max;
