@@ -17,6 +17,9 @@ const kCmdLoadFile = 'load-file';
 const kCmdSaveJson = 'save-json';
 const kCmdActivateFile = 'activate-file';
 
+const kMaxWidth = 480;
+const kMaxHeight = 480;
+
 this._sockets = [];
 this._connId = 1;
 this._watching = false;
@@ -225,8 +228,8 @@ app.get('/sensors', (req, res) => {
   const fontName = req.query.fontname || 'Consolas';
   const align = req.query.align || 'left';
   const type = req.query.type || 'str';
-  const w = parseInt(req.query.w || 480);
-  const h = parseInt(req.query.h || 480);
+  const w = parseInt(req.query.w || kMaxWidth);
+  const h = parseInt(req.query.h || kMaxHeight);
   let x = align === 'left' ? 0 : align === 'center' ? w / 2 : w;
   const y = 0;
   try {
@@ -260,8 +263,8 @@ app.get('/text', (req, res) => {
   const size = req.query.size || 32;
   const fontName = req.query.fontname || 'Consolas';
   const align = req.query.align || 'left';
-  const w = parseInt(req.query.w || 480);
-  const h = parseInt(req.query.h || 480);
+  const w = parseInt(req.query.w || kMaxWidth);
+  const h = parseInt(req.query.h || kMaxHeight);
   let x = align === 'left' ? 0 : align === 'center' ? w / 2 : w;
   const y = 0;
   try {
@@ -297,12 +300,14 @@ app.get('/gauge', (req, res) => {
   const value = req.query.value;
   const color = req.query.color || 'fff';
   const dotted = parseInt(req.query.dotted || 0);
+  const outline = parseInt(req.query.outline || 1);
   const angle = 1.0 - ((req.query.startangle || 360.0) / 360.0);
+  const min = req.query.min || 0;
   const max = req.query.max || 1000;
-  const w = parseInt(req.query.w || 480);
-  const h = parseInt(req.query.h || 480);
+  const w = parseInt(req.query.w || kMaxWidth);
+  const h = parseInt(req.query.h || kMaxHeight);
   const cc = parseInt(req.query.cc || 0);  // counter clockwise?
-  const cx = w / 2 + 4;
+  const cx = w / 2;
   const cy = h / 2;
   const size = cx - 2 * (outerWidth - innerWidth);
   try {
@@ -315,18 +320,20 @@ app.get('/gauge', (req, res) => {
     if (val > max) {
       val = max;
     }
-    const percent = val * 100 / max;
+    const percent = (val - min) / (max - min)* 100;
     const endAngle = PI2 + PI * (1.0 - angle);
     const startAngle = angle * PI;
     const endPercentAngle = !cc ?
       startAngle + (endAngle - startAngle) * percent / 100 :
       startAngle - (endAngle - startAngle) * percent / 100;
     //console.log('size=%d startAngle=%f endAngle=%f endPercentAngle=%f val=%f', size, startAngle, endAngle, endPercentAngle, val);
-    ctx.beginPath();
-    ctx.arc(cx, cy, size, cc ? PI - startAngle : startAngle, cc ? PI - endAngle : endAngle);
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = outerWidth;
-    ctx.stroke();
+    if (outline) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, size, cc ? PI - startAngle : startAngle, cc ? PI - endAngle : endAngle);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = outerWidth;
+      ctx.stroke();
+    }
 
     ctx.beginPath();
     ctx.globalAlpha = 1.0;
