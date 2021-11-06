@@ -3,11 +3,13 @@ const fs = require('fs');
 const ws = require('ws');
 const { createCanvas } = require('canvas');
 const msgHandler = require('./lib/message_handler');
+const { basename } = require('path');
 const app = express();
 const port = process.env.PW_PORT || 3000;
 const kJsonFile = 'widgets.json';
 const kDefaultJsonFile = 'widgets_default.json';
 const kListFile = 'widgets_list.json';
+const kDotFile = '1x1.png';
 const kSensorsFile = 'sensors.json';
 const kRootDir = process.env.PW_ROOT || 'd:/backgrounds';
 
@@ -16,13 +18,16 @@ const kCmdAdmin = 'admin';
 const kCmdLoadFile = 'load-file';
 const kCmdSaveJson = 'save-json';
 const kCmdActivateFile = 'activate-file';
+const kSensorData = 'sensor-data';
 
-const kMaxWidth = 480;
-const kMaxHeight = 480;
+const kMaxWidth = 488;
+const kMaxHeight = 488;
 
 this._sockets = [];
 this._connId = 1;
 this._watching = false;
+
+this._sensorData = undefined;
 
 app.use(express.static(kRootDir));
 app.use(express.static(__dirname + '/../client'));
@@ -44,6 +49,21 @@ const onFileSaved = (filename, server) => {
 const sendResponse = (cmd, err, server) => {
   server.send(JSON.stringify({ cmd: cmd, result: err }),
     { binary: false });
+};
+const sendSensorData = () => {
+  if (typeof this._sensorData !== 'object') {
+    return;
+  }
+  try {
+    for (const [client, server] of Object.entries(this._sockets)) {
+      if (server) {
+        server.send(JSON.stringify({ cmd: kSensorData, result: 200, data: this._sensorData }),
+          { binary: false });
+      }
+    }
+  } catch (err) {
+    console.log('Could not send sensor data. Err: %s', err);
+  }
 };
 const sendFile = (cmd, file, id) => {
   try {
@@ -146,6 +166,10 @@ const activateFile = (filename) => {
     console.error('Could not activate file %s. Err: %s', filename, err);
   }
 };
+const get1x1dot = () => {
+  const filename = kRootDir + '/' + kDotFile;
+  return fs.readFileSync(filename);
+};
 
 fs.watch(kRootDir, { encoding: 'utf8' }, (eventType, filename) => {
   if (!this._watching) {
@@ -215,11 +239,6 @@ app.get('/', (req, res) => {
   res.send('Page Watch')
 });
 app.get('/sensors', (req, res) => {
-  const filename = kRootDir + '/' + kSensorsFile;
-  if (!fs.existsSync(filename)) {
-    res.sendStatus(404);
-    return;
-  }
   const sensor = req.query.sensor;
   const value = req.query.value;
   const color = req.query.color || 'fff';
@@ -233,8 +252,12 @@ app.get('/sensors', (req, res) => {
   let x = align === 'left' ? 0 : align === 'center' ? w / 2 : w;
   const y = 0;
   try {
-    const json = JSON.parse(fs.readFileSync(filename));
-    let val = json.sensors[sensor][value];
+    if (typeof this._sensorData !== 'object') {
+      res.setHeader('content-type', 'image/png');
+      res.send(get1x1dot());
+      return;
+    }
+    let val = this._sensorData.sensors[sensor][value];
     const canvas = createCanvas(w, h);
     const context = canvas.getContext('2d');
     const fontSize = parseInt(size) * 2;
@@ -287,11 +310,6 @@ app.get('/text', (req, res) => {
   }
 });
 app.get('/gauge', (req, res) => {
-  const filename = kRootDir + '/' + kSensorsFile;
-  if (!fs.existsSync(filename)) {
-    res.sendStatus(404);
-    return;
-  }
   const PI = Math.PI;
   const PI2 = PI * 2;
   const outerWidth = 30;
@@ -311,8 +329,12 @@ app.get('/gauge', (req, res) => {
   const cy = h / 2;
   const size = cx - 2 * (outerWidth - innerWidth);
   try {
-    const json = JSON.parse(fs.readFileSync(filename));
-    let val = json.sensors[sensor][value];
+    if (typeof this._sensorData !== 'object') {
+      res.setHeader('content-type', 'image/png');
+      res.send(get1x1dot());
+      return;
+    }
+    let val = this._sensorData.sensors[sensor][value];
     const canvas = createCanvas(w, h);
     const ctx = canvas.getContext('2d');
     ctx.globalAlpha = 0.5;
@@ -352,7 +374,19 @@ app.get('/gauge', (req, res) => {
 });
 
 const server = app.listen(port, () => {
-  console.log(`Page watch app listening at http://localhost:${port}`)
+  console.log(`Page watch app listening at http://localhost:${port}`);
+  const filename = kRootDir + '/' + kSensorsFile;
+  if (fs.existsSync(filename)) {
+    setInterval(() => {
+      try {
+        const json = JSON.parse(fs.readFileSync(filename));
+        this._sensorData = json;
+      } catch(err) {
+        console.error('JSON parsing error: %s', err);
+      }
+      sendSensorData();
+    }, 1000);
+  }
 });
 server.on('upgrade', (request, socket, head) => {
   wsServer.handleUpgrade(request, socket, head, socket => {

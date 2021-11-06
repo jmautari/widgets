@@ -4,6 +4,7 @@ let hostName;
 let port;
 let host;
 let websocketUrl;
+let sensorData;
 
 const kRetryIntervalMs = 1000;  // Retry connection every second if disconnected.
 
@@ -14,12 +15,16 @@ const kYoutubeShare = 'youtube_share';
 
 // IPC commands
 const kCmdWidgets = 'widgets';
+const kSensorData = 'sensor-data';
 
 // Internal widget data to avoid refreshing when not modified.
 const kWidgetData = 'widget-data';
 
 // Query string parameters
 const kParamScreen = 'screen';
+
+// The minimum playback rate.
+const kMinPlaybackRate = 0.1;
 
 let reconnectTimer = 0;
 const clearTimer = () => {
@@ -56,6 +61,23 @@ const getPosCSS = (p) => {
   }
   return css;
 };
+const getPlaybackRate = (f) => {
+  // e.g. formula(100.0/sensor=0)
+  if (typeof sensorData !== 'object') {
+    return 1;
+  }
+  let sensors = [];
+  let m;
+  const re = /sensor=([0-9]+)/g;
+  while ((m = re.exec(f))) {
+    f = f.replace(m[0], sensorData.sensors[m[1]]["valueRaw"]);
+  }
+  let v = eval(f);
+  if (v < kMinPlaybackRate) {
+    v = kMinPlaybackRate;
+  }
+  return v;
+};
 const getYoutubeUrl = (url, share) => {
   if (!share) {
     return url.replace(/\/watch\?v=/, '/embed/');
@@ -65,8 +87,12 @@ const getYoutubeUrl = (url, share) => {
 };
 const getVideoTag = (o) => {
   const uri = '//' + host + '/' + o.uri;
+  const updateInterval = o.update || 0;
+  const playbackRate = o.playbackRate || undefined;
   return '<div style="' + getPosCSS(o.position) +
-    '"><video preload=true playsinline autoplay muted=true loop=true class="fsvideo">' + 
+    '"><video preload=true playsinline autoplay muted=true loop=true class="fsvideo"' +
+    '" update-interval="' + updateInterval + '"' + 
+    (playbackRate ? ' playback-rate="' + playbackRate + '"' : '') + '>' +
     '<source src="' + uri + '" type="video/mp4"></video></div>';
 }
 const getYoutubeTag = (o, share) => {
@@ -94,37 +120,55 @@ const createWidget = (o) => {
 };
 const startUpdater = () => {
   const img = document.getElementsByTagName('img');
-  const list = Array.prototype.slice.call(img);
+  const video = document.getElementsByTagName('video');
+  const img_list = Array.prototype.slice.call(img);
+  const video_list = Array.prototype.slice.call(video);
+  const list = Array.prototype.concat(img_list, video_list);
   if (list.length === 0)
     return;
   list.forEach(i => {
+    const is_video = i.tagName === 'VIDEO';
     const interval = parseInt(i.getAttribute('update-interval'));
     if (interval > 0) {
       i.setAttribute('update-active', 'true');
-      let source = i.getAttribute('data-source');
-      if (!source) {
-        source = i.src;
-        i.setAttribute('data-source', source);
-        i.addEventListener('load', () => {
+      if (is_video) {
+        const updatePlaybackRate = (i) => {
+          i.playbackRate = getPlaybackRate(i.getAttribute('playback-rate'));
           setTimeout(() => {
             if (i.getAttribute('update-active') === 'true') {
-              const u = i.getAttribute('data-source') + '&t=' + Date.now();
-              i.src = u;
+              updatePlaybackRate(i);
             }
           }, interval);
-        });
-        i.addEventListener('error', () => {
-          if (i.getAttribute('update-active') === 'true') {
-            console.log('Erro loading image. Retrying');
+        };
+        updatePlaybackRate(i);
+      } else {
+        let source = i.getAttribute('data-source');
+        if (!source) {
+          source = i.src;
+          i.setAttribute('data-source', source);
+          i.addEventListener('load', () => {
             setTimeout(() => {
               if (i.getAttribute('update-active') === 'true') {
                 const u = i.getAttribute('data-source') + '&t=' + Date.now();
                 i.src = u;
               }
             }, interval);
-          }
-        });
+          });
+          i.addEventListener('error', () => {
+            if (i.getAttribute('update-active') === 'true') {
+              console.log('Erro loading image. Retrying');
+              setTimeout(() => {
+                if (i.getAttribute('update-active') === 'true') {
+                  const u = i.getAttribute('data-source') + '&t=' + Date.now();
+                  i.src = u;
+                }
+              }, interval);
+            }
+          });
+        }
       }
+    } else if (is_video) {
+      i.playbackRate = i.getAttribute('playback-rate');
     }
   });
 };
@@ -173,6 +217,12 @@ const connect = () => {
           container.setAttribute(kWidgetData, htmlEncoded);
           container.innerHTML = html;
           startUpdater();
+        }
+      } else if (cmd == kSensorData) {
+        if (typeof data === 'object') {
+          sensorData = data;
+        } else {
+          console.error('Invalid sensor data received');
         }
       }
     };
