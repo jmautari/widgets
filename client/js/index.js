@@ -168,7 +168,8 @@ const startUpdater = () => {
         }
       }
     } else if (is_video) {
-      i.playbackRate = i.getAttribute('playback-rate');
+      const playbackRate = parseFloat(i.getAttribute('playback-rate')) || 1.0;
+      i.playbackRate = playbackRate;
     }
   });
 };
