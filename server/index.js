@@ -46,9 +46,40 @@ wsServer.on('connection', (ws, wc) => {
 const onFileSaved = (filename, server) => {
   sendFile(kCmdAdmin, kListFile, server);
 };
+const loadWidgetData = (data) => {
+  let includes = [];
+  data.widgets.forEach(w => {
+    const include = w.include || undefined;
+    if (typeof include === 'undefined') {
+      return;
+    } else if (typeof include === 'string') {
+      includes.push(include);
+    } else {
+      includes = include;
+    }
+  });
+  includes.forEach(i => {
+    const filename = kRootDir + '/widgets_' + i + '.json';
+    if (!fs.existsSync(filename)) {
+      return;
+    }
+    console.log('Including file %s', filename);
+    try {
+      const json = JSON.parse(readFile(filename));
+      json.widgets.forEach(w => data.widgets.push(w));
+    } catch(err) {
+      console.error('Could not parse %s', err);
+    }
+  });
+  return data;
+};
 const sendResponse = (cmd, err, server) => {
-  server.send(JSON.stringify({ cmd: cmd, result: err }),
-    { binary: false });
+  try {
+    server.send(JSON.stringify({ cmd: cmd, result: err }),
+      { binary: false });
+  } catch(err) {
+    console.error('Error sending error response. Err: %s', err);
+  }
 };
 const sendSensorData = () => {
   if (typeof this._sensorData !== 'object') {
@@ -160,7 +191,8 @@ const activateFile = (filename) => {
   const src = kRootDir + '/' + filename;
   const dst = kRootDir + '/' + kJsonFile;
   try {
-    fs.copyFileSync(src, dst);
+    const json = loadWidgetData(JSON.parse(readFile(src)));
+    fs.writeFileSync(dst, JSON.stringify(json));
     updateList(filename);
   } catch(err) {
     console.error('Could not activate file %s. Err: %s', filename, err);
@@ -320,6 +352,7 @@ app.get('/gauge', (req, res) => {
   const dotted = parseInt(req.query.dotted || 0);
   const outline = parseInt(req.query.outline || 1);
   const angle = 1.0 - ((req.query.startangle || 360.0) / 360.0);
+  const size  = -1 * (req.query.size || 0);
   const min = req.query.min || 0;
   const max = req.query.max || 1000;
   const w = parseInt(req.query.w || kMaxWidth);
@@ -327,7 +360,7 @@ app.get('/gauge', (req, res) => {
   const cc = parseInt(req.query.cc || 0);  // counter clockwise?
   const cx = w / 2;
   const cy = h / 2;
-  const size = cx - 2 * (outerWidth - innerWidth);
+  const radius = cx - 2 * (outerWidth - innerWidth);
   try {
     if (typeof this._sensorData !== 'object') {
       res.setHeader('content-type', 'image/png');
@@ -343,7 +376,7 @@ app.get('/gauge', (req, res) => {
       val = max;
     }
     const percent = (val - min) / (max - min)* 100;
-    const endAngle = PI2 + PI * (1.0 - angle);
+    const endAngle = PI2 + PI * (1.0 - angle + size);
     const startAngle = angle * PI;
     const endPercentAngle = !cc ?
       startAngle + (endAngle - startAngle) * percent / 100 :
@@ -351,7 +384,7 @@ app.get('/gauge', (req, res) => {
     //console.log('size=%d startAngle=%f endAngle=%f endPercentAngle=%f val=%f', size, startAngle, endAngle, endPercentAngle, val);
     if (outline) {
       ctx.beginPath();
-      ctx.arc(cx, cy, size, cc ? PI - startAngle : startAngle, cc ? PI - endAngle : endAngle);
+      ctx.arc(cx, cy, radius, cc ? PI - startAngle : startAngle, cc ? PI - endAngle : endAngle);
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = outerWidth;
       ctx.stroke();
@@ -359,9 +392,10 @@ app.get('/gauge', (req, res) => {
 
     ctx.beginPath();
     ctx.globalAlpha = 1.0;
-    ctx.arc(cx, cy, size, cc ? PI - startAngle : startAngle, cc ? PI - endPercentAngle : endPercentAngle);
+    ctx.arc(cx, cy, radius, cc ? PI - startAngle : startAngle, cc ? PI - endPercentAngle : endPercentAngle);
     ctx.strokeStyle = '#' + color;
     ctx.lineWidth = innerWidth;
+    ctx.lineCap = 'round';
     if (dotted) {
       ctx.setLineDash([2, 4]);
     }
