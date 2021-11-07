@@ -32,11 +32,24 @@ this._sensorData = undefined;
 app.use(express.static(kRootDir));
 app.use(express.static(__dirname + '/../client'));
 
+const parseJson = (s) => {
+  try {
+    return JSON.parse(s);
+  } catch (err) {
+    console.error('Could not parse JSON. Err: %s', err);
+    return undefined;
+  }
+};
+
 const wsServer = new ws.Server({ noServer: true });
 wsServer.on('connection', (ws, wc) => {
   ws.on('message', (message) => {
     try {
-      msgHandler.process(wc.socket, ws, JSON.parse(message));
+      const json = parseJson(message);
+      if (!json) {
+        return;
+      }
+      msgHandler.process(wc.socket, ws, json);
     } catch (err) {
       console.log('Invalid JSON while parsing incoming WS message. Err: %s', err);
     }
@@ -73,7 +86,10 @@ const loadWidgetData = (data) => {
     }
     console.log('Including file %s', filename);
     try {
-      const json = JSON.parse(readFile(filename));
+      const json = parseJson(readFile(filename));
+      if (!json) {
+        return;
+      }
       json.widgets.forEach(w => data.widgets.push(w));
     } catch(err) {
       console.error('Could not parse %s', err);
@@ -112,7 +128,10 @@ const sendFile = (cmd, file, id) => {
         return;
       }
       try {
-        const jsonData = JSON.parse(data);
+        const jsonData = parseJson(data);
+        if (!jsonData) {
+          return;
+        }
         if (id !== undefined) {
           let server;
           if (typeof id === 'object') {
@@ -152,7 +171,10 @@ const readFile = (filename) => {
 const addToList = (fname) => {
   const filename = kRootDir + '/' + kListFile;
   try {
-    let json = JSON.parse(readFile(filename));
+    let json = parseJson(readFile(filename));
+    if (!json) {
+      return;
+    }
     json.list.push({filename: fname, selected: false});
     fs.writeFileSync(filename, JSON.stringify(json, null, 2));
   } catch(err) {
@@ -180,7 +202,10 @@ const saveFile = (cmd, server, params) => {
 const updateList = (fname) => {
   const filename = kRootDir + '/' + kListFile;
   try {
-    let json = JSON.parse(readFile(filename));
+    let json = parseJson(readFile(filename));
+    if (!json) {
+      return;
+    }
     json.list.forEach(i => {
       if (i.selected && i.filename !== fname) {
         i.selected = false;
@@ -199,8 +224,12 @@ const activateFile = (filename) => {
   const src = kRootDir + '/' + filename;
   const dst = kRootDir + '/' + kJsonFile;
   try {
-    const json = loadWidgetData(JSON.parse(readFile(src)));
-    fs.writeFileSync(dst, JSON.stringify(json));
+    const json = parseJson(readFile(src));
+    if (!json) {
+      return;
+    }
+    const data = loadWidgetData(json);
+    fs.writeFileSync(dst, JSON.stringify(data));
     updateList(filename);
   } catch(err) {
     console.error('Could not activate file %s. Err: %s', filename, err);
@@ -426,7 +455,7 @@ const server = app.listen(port, () => {
           console.warn('Could not ready sensors file');
           return;
         }
-        const json = JSON.parse(data);
+        const json = parseJson(data);
         this._sensorData = json;
       } catch(err) {
         console.error('JSON parsing error: %s', err);
