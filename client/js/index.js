@@ -243,7 +243,7 @@ const start = () => {
 };
 bootLoader(() => {
   hostName = config.host || 'mr-pc';
-  port = config.port || 3000;
+  port = config.port || 30000;
   host = hostName + ':' + port;
   websocketUrl = 'ws://' + host;
 

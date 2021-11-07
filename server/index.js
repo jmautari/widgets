@@ -5,7 +5,7 @@ const { createCanvas } = require('canvas');
 const msgHandler = require('./lib/message_handler');
 const { basename } = require('path');
 const app = express();
-const port = process.env.PW_PORT || 3000;
+const port = process.env.PW_PORT || 30000;
 const kJsonFile = 'widgets.json';
 const kDefaultJsonFile = 'widgets_default.json';
 const kListFile = 'widgets_list.json';
@@ -48,19 +48,27 @@ const onFileSaved = (filename, server) => {
 };
 const loadWidgetData = (data) => {
   let includes = [];
+  const addInclude = (include) => {
+    if (includes.indexOf(include) === -1) {
+      includes.push(include);
+    } else {
+      console.warn('Ignoring duplicated entry: %s', include);
+    }
+  };
   data.widgets.forEach(w => {
     const include = w.include || undefined;
     if (typeof include === 'undefined') {
       return;
     } else if (typeof include === 'string') {
-      includes.push(include);
-    } else {
-      includes = include;
+      addInclude(include);
+    } else if (typeof include === 'object') {
+      include.forEach(i => addInclude(i));
     }
   });
   includes.forEach(i => {
     const filename = kRootDir + '/widgets_' + i + '.json';
     if (!fs.existsSync(filename)) {
+      console.warn('File %s is not valid', filename);
       return;
     }
     console.log('Including file %s', filename);
@@ -352,7 +360,7 @@ app.get('/gauge', (req, res) => {
   const dotted = parseInt(req.query.dotted || 0);
   const outline = parseInt(req.query.outline || 1);
   const angle = 1.0 - ((req.query.startangle || 360.0) / 360.0);
-  const size  = -1 * (req.query.size || 0);
+  const size  = req.query.size || 1.0;
   const min = req.query.min || 0;
   const max = req.query.max || 1000;
   const w = parseInt(req.query.w || kMaxWidth);
@@ -375,12 +383,12 @@ app.get('/gauge', (req, res) => {
     if (val > max) {
       val = max;
     }
-    const percent = (val - min) / (max - min)* 100;
-    const endAngle = PI2 + PI * (1.0 - angle + size);
+    const percent = (val - min) / (max - min);
+    const endAngle = PI2 + PI * (1.0 - angle);
     const startAngle = angle * PI;
     const endPercentAngle = !cc ?
-      startAngle + (endAngle - startAngle) * percent / 100 :
-      startAngle - (endAngle - startAngle) * percent / 100;
+      startAngle + (endAngle - startAngle) * percent :
+      startAngle - (endAngle - startAngle) * percent;
     //console.log('size=%d startAngle=%f endAngle=%f endPercentAngle=%f val=%f', size, startAngle, endAngle, endPercentAngle, val);
     if (outline) {
       ctx.beginPath();
@@ -413,7 +421,12 @@ const server = app.listen(port, () => {
   if (fs.existsSync(filename)) {
     setInterval(() => {
       try {
-        const json = JSON.parse(fs.readFileSync(filename));
+        const data = readFile(filename);
+        if (!data) {
+          console.warn('Could not ready sensors file');
+          return;
+        }
+        const json = JSON.parse(data);
         this._sensorData = json;
       } catch(err) {
         console.error('JSON parsing error: %s', err);

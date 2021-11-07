@@ -91,12 +91,12 @@ Possible output:
 [nodemon] watching path(s): *.*
 [nodemon] watching extensions: js,mjs,json
 [nodemon] starting `node index.js`
-Page watch app listening at http://localhost:3000
+Page watch app listening at http://localhost:30000
 ```
 
 ### Testing the server
 
-Open a browser tab on your computer and navigate to `http://localhost:3000`
+Open a browser tab on your computer and navigate to `http://localhost:30000`
 
 The page should show whatever widgets you have defined for screen: 0 in your widgets.json file
 
@@ -148,7 +148,7 @@ const config = {
 
 ## Testing the client
 
-Connect to your Raspberry Pi via VNC and open Chromium, then navigate to `http://YOUR-PC-NAME:3000`
+Connect to your Raspberry Pi via VNC and open Chromium, then navigate to `http://YOUR-PC-NAME:30000`
 
 You should see the same contents when you tested the server on your computer. If you don't, go back
 and check the configuration. It's worth noting that both client and server must be running on the same local network.
@@ -186,7 +186,7 @@ Supports video files (`.mp4`), images in general (`.gif*` `.jpg` `.png` etc.) an
 
 ## Editing, copying and switching between widget configuration profiles
 
-Open `http://YOUR-PC-NAME:3000/admin/` in a browser tab to access a web-based tool that allows quick editing, copying and switching between your widget configuration profiles.
+Open `http://YOUR-PC-NAME:30000/admin/` in a browser tab to access a web-based tool that allows quick editing, copying and switching between your widget configuration profiles.
 
 In the video below the two LCD screens inside the Lian Li O11 Dynamic XL case are connected to a Raspberry Pi 4 Model B.
 
@@ -201,13 +201,13 @@ $ sudo nano /etc/xdg/lxsession/LXDE-pi/autostart
 ```
 
 ```
-chromium-browser --new-window --incognito --start-fullscreen --window-position=0,0 --noerrdialogs --user-data-dir=/tmp/screen-1 --app=http://YOUR-PC-NAME:3000/index.html?screen=0 &
+chromium-browser --new-window --incognito --start-fullscreen --window-position=0,0 --noerrdialogs --user-data-dir=/tmp/screen-1 --app=http://YOUR-PC-NAME:30000/index.html?screen=0 &
 ```
 
 If you have two screens connected to the Raspberry Pi, add another line as follows (modify the `--window-position` values to match your primary screen width)
 
 ```
-chromium-browser --new-window --incognito --start-fullscreen --window-position=800,0 --noerrdialogs --user-data-dir=/tmp/screen-2 --app=http://YOUR-PC-NAME:3000/index.html?screen=1 &
+chromium-browser --new-window --incognito --start-fullscreen --window-position=800,0 --noerrdialogs --user-data-dir=/tmp/screen-2 --app=http://YOUR-PC-NAME:30000/index.html?screen=1 &
 ```
 
 Press `CTRL+X` `Y` to save your changes.
