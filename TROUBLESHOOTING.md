@@ -4,7 +4,7 @@
 * [Changes made to the widgets.json file don't propagate to clients](#issue2)
 
 ### <a name="issue1">The server doesn't start</a>
-> Make sure the port used by the server isn't in use by another application. Also make sure the port isn't reserved by Hyper-V. Use the command below on an elevated command prompt/Powershell to see the reserved port ranges.
+> Make sure the port used by the server isn't in use by another application. Also make sure the port isn't reserved by Hyper-V. Use the command below on a command prompt/Powershell to see the reserved port ranges.
 ```
 netsh interface ipv4 show excludedportrange protocol=tcp
 ```
