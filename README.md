@@ -201,18 +201,22 @@ $ sudo nano /etc/xdg/lxsession/LXDE-pi/autostart
 ```
 
 ```
-chromium-browser --new-window --incognito --start-fullscreen --window-position=0,0 --noerrdialogs --user-data-dir=/tmp/screen-1 --app=http://YOUR-PC-NAME:30000/index.html?screen=0 &
+chromium-browser --new-window --start-fullscreen --window-position=0,0 --noerrdialogs --user-data-dir=/tmp/screen-1 --app=http://YOUR-PC-NAME:30000/index.html?screen=0 &
 ```
 
 If you have two screens connected to the Raspberry Pi, add another line as follows (modify the `--window-position` values to match your primary screen width)
 
 ```
-chromium-browser --new-window --incognito --start-fullscreen --window-position=800,0 --noerrdialogs --user-data-dir=/tmp/screen-2 --app=http://YOUR-PC-NAME:30000/index.html?screen=1 &
+chromium-browser --new-window --start-fullscreen --window-position=800,0 --noerrdialogs --user-data-dir=/tmp/screen-2 --app=http://YOUR-PC-NAME:30000/index.html?screen=1 &
 ```
 
 Press `CTRL+X` `Y` to save your changes.
 
-Be sure to create the `/tmp/screen-1` (and `/tmp/screen-2` if using two screens) to allow Chromium to work properly. The `--user-data-dir` option is required to allow more than one screen, if you have only one screen I think it may be omitted.
+The `--user-data-dir` option is required to allow more than one screen, if you have only one screen it may be omitted. Be sure to create the `/tmp/screen-1` (and `/tmp/screen-2` if using two screens) to allow Chromium to work properly - e.g.
+
+```
+$ mkdir /tmp/screen-1
+```
 
 Reboot your Raspberry Pi to verify your changes.
 
