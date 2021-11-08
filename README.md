@@ -249,6 +249,54 @@ Add the lines below to the bottom of the file
 
 Press `CTRL+X` `Y` to save your changes.
 
+Additionally it's recommended to [increase the Raspian swap file size](https://pimylifeup.com/raspberry-pi-swap-file/) which defaults to only 100MB.
+
+Before starting make sure any running programs are closed.
+
+1. Temporarily stop the swap file usage.
+
+To stop the operating system from using the current swap file run the following command:
+
+```
+$ sudo dphys-swapfile swapoff
+```
+
+2. Modify the swap file configuration file.
+
+Use the command below to open the swap file configuration file
+
+```
+$ sudo nano /etc/dphys-swapfile
+```
+
+3. Change the default swap file size by changing the line below.
+
+```
+CONF_SWAPSIZE=100
+```
+
+To increase the swap file size to 1GB, just change the default value of 100 (value in MB) to 1024.
+
+```
+CONF_SWAPSIZE=1024
+```
+
+Whatever size you set, that space must be available on the SD card.
+
+Save the changes by pressing `CTRL+X` Y then press ENTER.
+
+4. Delete the original swap file and recreate it to fit the newly defined size.
+
+```
+$ sudo dphys-swapfile setup
+```
+
+6. Turn the swap file usage back on.
+
+```
+$ sudo dphys-swapfile swapon
+```
+
 Reboot your Raspberry Pi to verify your changes.
 
 ```
