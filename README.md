@@ -218,6 +218,37 @@ The `--user-data-dir` option is required to allow more than one screen, if you h
 $ mkdir /tmp/screen-1
 ```
 
+I also recommend installing `unclutter` to remove the mouse cursor. Just clone unclutter repo and add a single line to the `autostart` configuration file
+
+```
+$ sudo apt-get install unclutter
+$ sudo nano /etc/xdg/lxsession/LXDE-pi/autostart
+```
+
+Add the following line to the end of `autostart` file
+
+```
+@unclutter -idle 0
+```
+
+Press `CTRL+X` `Y` to save your changes.
+
+It's also recommended to disable screen blanking (to avoid the screen to enter sleep mode). Edit the file `/home/pi/.config/lxsession/LXDE-pi/autostart`
+
+```
+$ sudo nano /home/pi/.config/lxsession/LXDE-pi/autostart
+```
+
+Add the lines below to the bottom of the file
+
+```
+@xset s off
+@xset -dpms 
+@xset s noblank
+```
+
+Press `CTRL+X` `Y` to save your changes.
+
 Reboot your Raspberry Pi to verify your changes.
 
 ```
