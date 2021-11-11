@@ -390,6 +390,7 @@ app.get('/gauge', (req, res) => {
   const outline = parseInt(req.query.outline || 1);
   const angle = 1.0 - ((req.query.startangle || 360.0) / 360.0);
   const size  = req.query.size || 1.0;
+  const rounded = req.query.rounded || false;
   const min = req.query.min || 0;
   const max = req.query.max || 1000;
   const w = parseInt(req.query.w || kMaxWidth);
@@ -432,7 +433,9 @@ app.get('/gauge', (req, res) => {
     ctx.arc(cx, cy, radius, cc ? PI - startAngle : startAngle, cc ? PI - endPercentAngle : endPercentAngle);
     ctx.strokeStyle = '#' + color;
     ctx.lineWidth = innerWidth;
-    ctx.lineCap = 'round';
+    if (rounded) {
+      ctx.lineCap = 'round';
+    }
     if (dotted) {
       ctx.setLineDash([2, 4]);
     }
