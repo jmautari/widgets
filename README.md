@@ -2,6 +2,8 @@
 
 A simple client/server app to render widgets defined by a JSON file onto a web browser page.
 
+Used primarily on my Lian Li O11 Dynamic XL [LCD mod](LCD_MOD.md)
+
 Client (JS) and Server (Node.js) included, see `/path/to/repo/client` and `/path/to/repo/server`
 
 Can be used on any device that can run a modern web browser.
