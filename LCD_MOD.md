@@ -2,6 +2,17 @@
 
 ![lcd_mod](https://user-images.githubusercontent.com/5205328/141392088-b8ac4f06-eb81-4333-bed7-cf08c0d96708.jpg)
 
+# Contents
+* [How to](#how-to)
+* [15.6" (front)](#156-front)
+* [7" (back)](#7-back)
+* [2.1" rounded (Galahad AIO pump cover)](#21-rounded-galahad-aio-pump-cover)
+* [How to setup the screens](#how-to-setup-the-screens)
+  * [15.6"](#156-screen)
+  * [7"](#7-screen)
+  * [2.1" rounded](#21-rounded-screen)
+* [Other stuff](#other-stuff)
+
 ## How to
 
 If you are interested about the LCD screens used on my [LCD mod](https://pcpartpicker.com/b/ftMcCJ) for the Lian Li O11 Dynamic XL, I've put some information together that may help you
@@ -30,6 +41,8 @@ Also available on Chicago Electronics, Adafruit and other stores.
 
 ## How to setup the screens
 
+### 15.6" screen
+
 The 15.6" screen is connected to the video card via HDMI, you'll just need some creativity to center it vertically like I did. I used some cable clips that I had around, like [these][1] - I put two below the front monitor as can be seen below using double sided tape.
 
 ![clips](https://user-images.githubusercontent.com/5205328/141391541-e71d70f3-904e-409b-86d0-6842eaa4b7a6.jpg)
@@ -40,7 +53,11 @@ The HDMI cable and USB C cable to power the screen go on top as can be seen belo
 
 To fill the spaces out on top and bottom of the front panel glass I used a black film like [this][3].
 
+### 7" screen
+
 The 7" screen is connected to a Raspberry Pi 4 Model B via HDMI but if you have a spare HDMI connection (or a DP connection with a DP -> HDMI adapter) the video card can be used instead of the Raspberry Pi which saves some money. I mounted the Raspberry Pi 4 on O11's back chamber.
+
+### 2.1 Rounded screen
 
 The 2.1" rounded screen requires a Raspberry Pi Zero 2 W, a Raspberry Pi Zero W can be used but it is too slow to show MP4/gifs. I mounted the 2.1" rounded screen and the Raspberry Pi Zero 2 W that sits on the back of the screen using the Galahad AIO pump magnetic cover and some double sided tape. The pics below show a Pi Zero WH but it was upgraded later to a Pi Zero 2 W which is much better for animated gifs and smooth MP4 playback.
 
