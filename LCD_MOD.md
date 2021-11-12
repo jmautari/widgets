@@ -8,9 +8,9 @@
 * [7" (back)](#7-back)
 * [2.1" rounded (Galahad AIO pump cover)](#21-rounded-galahad-aio-pump-cover)
 * [How to setup the screens](#how-to-setup-the-screens)
-  * [15.6"](#156-screen)
-  * [7"](#7-screen)
-  * [2.1" rounded](#21-rounded-screen)
+  * [15.6" screen](#156-screen)
+  * [7" screen](#7-screen)
+  * [2.1" rounded screen](#21-rounded-screen)
 * [Other stuff](#other-stuff)
 
 ## Intro
@@ -57,7 +57,7 @@ To fill the spaces out on top and bottom of the front panel glass I used a black
 
 The 7" screen is connected to a Raspberry Pi 4 Model B via HDMI but if you have a spare HDMI connection (or a DP connection with a DP -> HDMI adapter) the video card can be used instead of the Raspberry Pi which saves some money. I mounted the Raspberry Pi 4 on O11's back chamber.
 
-### 2.1 Rounded screen
+### 2.1 rounded screen
 
 The 2.1" rounded screen requires a Raspberry Pi Zero 2 W, a Raspberry Pi Zero W can be used but it is too slow to show MP4/gifs. I mounted the 2.1" rounded screen and the Raspberry Pi Zero 2 W that sits on the back of the screen using the Galahad AIO pump magnetic cover and some double sided tape. The pics below show a Pi Zero WH but it was upgraded later to a Pi Zero 2 W which is much better for animated gifs and smooth MP4 playback.
 
