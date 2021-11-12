@@ -40,7 +40,7 @@ https://shop.pimoroni.com/products/hyperpixel-round
 
 Also available on Chicago Electronics, Adafruit and other stores.
 
-The Hyperpixel 2.1 round fits perfectly on top of Galahad AIO pump, has excelent IQ and is super bright. Using the app on this repository is possible to create cool effects like the samples below:
+The Hyperpixel 2.1 round fits perfectly on top of Galahad AIO pump, has excelent IQ and is super bright. Using the app on this repository it is possible to create cool effects like the samples below:
 
 https://user-images.githubusercontent.com/5205328/141450657-1ef4371f-55f5-48d3-a337-91e073c9b1ea.mp4
 
