@@ -11,7 +11,8 @@
   * [15.6" screen](#156-screen)
   * [7" screen](#7-screen)
   * [2.1" rounded screen](#21-rounded-screen)
-* [Other stuff](#other-stuff)
+* [Other stuff needed](#other-stuff-needed)
+* [Managing the screens](#managing-the-screens)
 
 ## Intro
 
@@ -72,9 +73,17 @@ Just place the screen using the AIO pump magnetic cover and plug in the micro US
 
 https://user-images.githubusercontent.com/5205328/141391432-19e98579-0d28-4940-a31b-31982544df64.mp4
 
-## Other stuff
+## Other stuff needed
 
 Some regular HDMI/USB C/micro USB cables.
+
+## Managing the screens
+
+This repository's app is used to control what gets displayed on each screen as can be seen in the video below:
+
+https://user-images.githubusercontent.com/5205328/139523342-f8864793-be65-4ef3-8346-abf27701e266.mp4
+
+See [README.md](README.md)
 
 [1]: https://smile.amazon.com/gp/product/B07YV2TT44/ref=ppx_yo_dt_b_search_asin_title?ie=UTF8&psc=1
 [2]: img/clips.jpg
