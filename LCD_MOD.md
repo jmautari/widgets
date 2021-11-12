@@ -3,7 +3,7 @@
 ![lcd_mod](https://user-images.githubusercontent.com/5205328/141392088-b8ac4f06-eb81-4333-bed7-cf08c0d96708.jpg)
 
 # Contents
-* [How to](#how-to)
+* [Intro](#intro)
 * [15.6" (front)](#156-front)
 * [7" (back)](#7-back)
 * [2.1" rounded (Galahad AIO pump cover)](#21-rounded-galahad-aio-pump-cover)
@@ -13,7 +13,7 @@
   * [2.1" rounded](#21-rounded-screen)
 * [Other stuff](#other-stuff)
 
-## How to
+## Intro
 
 If you are interested about the LCD screens used on my [LCD mod](https://pcpartpicker.com/b/ftMcCJ) for the Lian Li O11 Dynamic XL, I've put some information together that may help you
 getting the mod setup on your end. If you have a Lian Li O11 Dynamic XL and some money and time to spare, it's a very easy mod that just needs the right screens. Here's a list of the LCD screens I'm using:
