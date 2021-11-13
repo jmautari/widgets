@@ -44,7 +44,7 @@ The Hyperpixel 2.1 round fits perfectly on top of Galahad AIO pump, has excelent
 
 https://user-images.githubusercontent.com/5205328/141450657-1ef4371f-55f5-48d3-a337-91e073c9b1ea.mp4
 
-https://user-images.githubusercontent.com/5205328/141451065-662d3efe-b182-4a3a-b350-cf0cf2d7ef3b.mp4
+https://user-images.githubusercontent.com/5205328/141605232-7a6a453a-8ed0-460c-9b07-933130c0994c.mp4
 
 ## How to setup the screens
 
