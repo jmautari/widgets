@@ -6,9 +6,9 @@ Used primarily on my Lian Li O11 Dynamic XL [LCD mod](LCD_MOD.md)
 
 Client (JS) and Server (Node.js) included, see `/path/to/repo/client` and `/path/to/repo/server`
 
-Can be used on any device that can run a modern web browser.
-Created to make easier to update remote LCD screens connected to an Raspberry Pi 4 Model B (see demo video below)
-but can be used with regular monitor(s) on any device, including smartphones and tablets.
+The companion app [widget-sensors][1] can track sensor data fed by [HWINFO][2] (free version) and sensor data can be displayed using widgets to monitor hardware information such as CPU temperature, GPU usage etc.
+
+Widgets can be used on any device that can run a modern web browser, and it was created to make easier to update remote LCD screens connected to an Raspberry Pi 4 Model B (see demo video below) but can be used with regular monitor(s) on any device, including smartphones and tablets.
 
 ## Demo
 
@@ -320,3 +320,6 @@ Built with
 * [Express](https://expressjs.com/)
 * [ws: a Node.js WebSocket library](https://www.npmjs.com/package/ws)
 * [nodemon](https://www.npmjs.com/package/nodemon)
+
+[1]: https://github.com/jmautari/widget-sensors
+[2]: https://github.com/jmautari/widget-sensors#download
