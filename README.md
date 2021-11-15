@@ -8,7 +8,7 @@ Client (JS) and Server (Node.js) included, see `/path/to/repo/client` and `/path
 
 The companion app [widget-sensors][1] can track sensor data fed by [HWINFO][2] (free version) and sensor data can be displayed using widgets to monitor hardware information such as CPU temperature, GPU usage etc.
 
-Widgets can be used on any device that can run a modern web browser, and it was created to make easier to update remote LCD screens connected to an Raspberry Pi 4 Model B (see demo video below) but can be used with regular monitor(s) on any device, including smartphones and tablets.
+Widgets can be used on any device that can run a modern web browser. The app was created to make easier to update remote LCD screens connected to an Raspberry Pi 4 Model B (see demo video below) but can be used with regular monitor(s) on any device, including smartphones and tablets.
 
 ## Demo
 
