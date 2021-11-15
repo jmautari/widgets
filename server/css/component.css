@@ -1,0 +1,147 @@
+@import url(http://fonts.googleapis.com/css?family=Yanone+Kaffeesatz:400,200);
+
+
+.wrap{
+height: auto;
+float: left;
+}
+.fa{
+color:#FFFFFF;
+}
+.fa img {
+  max-width:96px;
+  max-height:96px;
+}
+div[class^="btn"]{
+float: left;
+margin: 0 10px 10px 0;
+height: 95px;
+position: relative;
+cursor: pointer;
+transition: all .4s ease;
+user-drag: element;
+border: solid 2px transparent;
+text-align:center;
+line-height:100px;
+}
+div[class^="btn"]:hover{
+	opacity: 0.7;
+}
+div[class^="btn"]:active{
+	transform: scale(.98,.98);
+}
+.btn-big{width: 200px;}
+.btn-small{width: 95px;}
+.last{margin-right: 0 !important;}
+.Start{
+color: white;
+font: normal 50px 'Yanone Kaffeesatz', sans-serif;
+margin:12px 0;
+cursor: pointer;
+user-select: none;
+transition: all .3s ease;
+}
+.Start:hover{
+  text-shadow: 0 0 4px white;
+}
+.space{
+	margin-bottom: 110px;
+}
+.label{
+	position: absolute;
+	color: white;
+	font: 500 12px sans-serif;
+	left: 10px;
+  user-select: none;
+}
+.bottom{bottom: 5px;}
+.top{top: 5px;}
+
+.red{background: #df0024;}
+.blue{ background: #00a9ec;}
+.orange{background: #ff9000;}
+.green{background: #0e5d30;}
+.purple{background: #8b0189;}
+.red-light{background: #ce4e4e;}
+.photo{
+  background: url('http://lorempixel.com/200/95/people');
+  background-position: -2px -2px;
+}
+.gray{
+  background: #5f5f5f;
+  animation: flip 6s linear infinite;
+  transform: rotateX(0deg);
+}
+.green-bright{background: #78d204;}
+.blue-nav{background: #25478e;}
+.redish{background: #fe0000;}
+.yellow{background: #d0d204;}
+
+
+div[class^="icon"]{
+	width: 45px;
+	height: 45px;
+	margin: 20px auto;
+	background-size: 45px 45px;
+}
+
+::-webkit-scrollbar{
+  width: 10px;
+	height: 10px;
+	cursor: pointer;	
+}
+::-webkit-scrollbar-track {
+    -webkit-box-shadow: inset 0 0 6px 2px rgba(0,0,0,0.3);
+    background: #007491;
+}
+::-webkit-scrollbar-thumb {
+    background: #002f3b; 
+    -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.5);
+    cursor: pointer;
+}
+::selection{
+    background: mintcream; 
+}
+
+@keyframes flip{
+  0%{
+    transform: rotateX(0deg);
+  }
+  15%{
+    transform: rotateX(360deg);  
+  }
+  100%{
+    transform: rotateX(360deg); 
+  }
+}
+
+.photo img{
+  top: -4px;
+  left: -4px;
+  position: absolute;
+  opacity: 0;
+  animation: fade 8s ease-in-out infinite 8s;
+  z-index: 0;
+  border: solid 2px transparent;
+  transition: all .3s ease;
+}
+
+.photo img:hover{
+  border: solid 2px mintcream;
+}
+
+@keyframes fade{
+  0%{
+    opacity: 0; 
+  }
+  10%{
+    opacity: 1;
+  }
+  50%{
+    opacity: 1;
+  }
+  60%{
+    opacity: 0;
+  }
+}
+

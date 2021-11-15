@@ -5,6 +5,8 @@ let port;
 let host;
 let websocketUrl;
 let sensorData;
+let broadcastChannel;
+let ws;
 
 const kRetryIntervalMs = 1000;  // Retry connection every second if disconnected.
 
@@ -12,9 +14,11 @@ const kRetryIntervalMs = 1000;  // Retry connection every second if disconnected
 const kVideo = 'video';
 const kYoutube = 'youtube';
 const kYoutubeShare = 'youtube_share';
+const kButtons = 'buttons';
 
 // IPC commands
 const kCmdWidgets = 'widgets';
+const kCmdButtons = 'buttons-action';
 const kSensorData = 'sensor-data';
 
 // Internal widget data to avoid refreshing when not modified.
@@ -44,6 +48,8 @@ const getType = (u) => {
     return kYoutube;
   } else if (u.match(/youtu\.be/i)) {
     return kYoutubeShare;
+  } else if (u.match(/buttons/)) {
+    return kButtons;
   }
   return undefined;
 };
@@ -109,12 +115,24 @@ const getImageTag = (o) => {
   return '<img src="' + uri + '" style="' + getPosCSS(o.position) +
     '" update-interval="' + updateInterval + '">';
 };
+const getButtonsData = (o) => {
+  return encodeURIComponent(JSON.stringify(o.buttons));
+};
+const getButtons = (o) => {
+  return '<div class="buttons-wrapper">' +
+    '<iframe src="' + o.uri + '&buttons=' +
+    getButtonsData(o) + '" frameborder="0" ' +
+    'style="width:' + o.position.w + ';height:' + o.position.h + '">' + 
+    '</iframe></div>';
+};
 const createWidget = (o) => {
   const type = getType(o.uri);
   if (type === kVideo) {
     return getVideoTag(o);
   } else if (type === kYoutube || type === kYoutubeShare) {
     return getYoutubeTag(o, type === kYoutubeShare);
+  } else if (type === kButtons) {
+    return getButtons(o);
   }
   return getImageTag(o);
 };
@@ -187,7 +205,7 @@ const stopUpdater = () => {
 };
 const connect = () => {
   try {
-    const ws = new WebSocket(websocketUrl);
+    ws = new WebSocket(websocketUrl);
     ws.onclose = () => {
       console.log('Socket closed');
       start();
@@ -247,6 +265,15 @@ bootLoader(() => {
   port = config.port || 30000;
   host = hostName + ':' + port;
   websocketUrl = 'ws://' + host;
+
+  broadcastChannel = new BroadcastChannel('buttons-channel');
+  broadcastChannel.onmessage = (m) => {
+    if (!ws) {
+      console.error('WS not defined');
+      return;
+    }
+    ws.send(JSON.stringify({ cmd: kCmdButtons, data: m.data }));
+  };
 
   start();
 });

@@ -4,6 +4,7 @@ const ws = require('ws');
 const { createCanvas } = require('canvas');
 const msgHandler = require('./lib/message_handler');
 const { basename } = require('path');
+const { execFile } = require("child_process")
 const app = express();
 const port = process.env.PW_PORT || 30000;
 const kJsonFile = 'widgets.json';
@@ -18,14 +19,31 @@ const kCmdAdmin = 'admin';
 const kCmdLoadFile = 'load-file';
 const kCmdSaveJson = 'save-json';
 const kCmdActivateFile = 'activate-file';
-const kSensorData = 'sensor-data';
+const kCmdButtons = 'buttons-action';
 
+const kButtonsActivateProfile = 'activateProfile';
+const kButtonsActionStartProgram = 'startProgram';
+
+const kValueRaw = 'valueRaw';
+const kSensorData = 'sensor-data';
+const kGraphColors = [
+  'FF6633', 'FFB399', 'FF33FF', 'FFFF99', '00B3E6',
+  'E6B333', '3366E6', '999966', '99FF99', 'B34D4D',
+  '80B300', '809900', 'E6B3B3', '6680B3', '66991A',
+  'FF99E6', 'CCFF1A', 'FF1A66', 'E6331A', '33FFCC',
+  '66994D', 'B366CC', '4D8000', 'B33300', 'CC80CC',
+  '66664D', '991AFF', 'E666FF', '4DB3FF', '1AB399',
+  'E666B3', '33991A', 'CC9999', 'B3B31A', '00E680',
+  '4D8066', '809980', 'E6FF80', '1AFF33', '999933',
+  'FF3380', 'CCCC00', '66E64D', '4D80CC', '9900B3',
+  'E64D66', '4DB380', 'FF4D4D', '99E6E6', '6666FF'];
 const kMaxWidth = 488;
 const kMaxHeight = 488;
 
 this._sockets = [];
 this._connId = 1;
 this._watching = false;
+this._graphs = [];
 
 this._sensorData = undefined;
 
@@ -61,6 +79,7 @@ const onFileSaved = (filename, server) => {
 };
 const loadWidgetData = (data) => {
   let includes = [];
+  let nestedIncludes = [];
   const addInclude = (include) => {
     if (includes.indexOf(include) === -1) {
       includes.push(include);
@@ -84,6 +103,29 @@ const loadWidgetData = (data) => {
       console.warn('File %s is not valid', filename);
       return;
     }
+    try {
+      const json = parseJson(readFile(filename));
+      if (!json) {
+        return;
+      }
+      json.widgets.forEach(w => {
+        if (typeof w.include === 'string') {
+          nestedIncludes.push(w.include);
+        }
+      });
+    } catch(err) {
+      console.error('Could not parse %s', err);
+    }
+  });
+  nestedIncludes.forEach(i => {
+    addInclude(i);
+  });
+  includes.forEach(i => {
+    const filename = kRootDir + '/widgets_' + i + '.json';
+    if (!fs.existsSync(filename)) {
+      console.warn('File %s is not valid', filename);
+      return;
+    }
     console.log('Including file %s', filename);
     try {
       const json = parseJson(readFile(filename));
@@ -91,11 +133,10 @@ const loadWidgetData = (data) => {
         return;
       }
       json.widgets.forEach(w => data.widgets.push(w));
-    } catch(err) {
+    } catch (err) {
       console.error('Could not parse %s', err);
     }
-  });
-  return data;
+  });  return data;
 };
 const sendResponse = (cmd, err, server) => {
   try {
@@ -219,6 +260,19 @@ const updateList = (fname) => {
   }
 
 };
+const startProgram = (path) => {
+  if (!fs.existsSync(path)) {
+    console.error('Path %s does not exist', path);
+    return;
+  }
+  console.log('Starting %s', path);
+  try {
+    execFile(path);
+    console.log('Process should be running now');
+  } catch(err) {
+    console.error('Could not start process. Err: %s', err);
+  }
+};
 const activateFile = (filename) => {
   console.log('Activating %s', filename);
   const src = kRootDir + '/' + filename;
@@ -263,6 +317,14 @@ msgHandler.on(kCmdWidgets,
       });
     }
     sendFile(kCmdWidgets, kJsonFile, client.connId);
+  });
+msgHandler.on(kCmdButtons,
+  (client, server, params) => {
+    if (params.action === kButtonsActivateProfile) {
+      activateFile('widgets_' + params.data.profile + '.json');
+    } else if (params.action === kButtonsActionStartProgram) {
+      startProgram(params.data.path);
+    }
   });
 msgHandler.on(kCmdAdmin,
   (client, server) => {
@@ -446,6 +508,156 @@ app.get('/gauge', (req, res) => {
     res.send('Error');
   }
 });
+app.get('/graph', (req, res) => {
+  const id = req.query.id || 0;
+  let sensors = req.query.sensors || [];
+  let ranges = req.query.ranges || [];
+  let colors = req.query.colors || kGraphColors;
+  const color = req.query.color || 'ffffff';
+  const alpha = req.query.alpha || 0.5;
+  const w = parseInt(req.query.w || kMaxWidth);
+  const h = parseInt(req.query.h || kMaxHeight);
+  const margin = req.query.margin || 20;
+  const samplePeriod = w - margin * 2;
+  const lineWidth = req.query.lineWidth || 1;
+  const fill = req.query.fill || false;
+  let graph = this._graphs[id] || getDefaultGraphData();
+  try {
+    if (typeof this._sensorData !== 'object') {
+      res.setHeader('content-type', 'image/png');
+      res.send(get1x1dot());
+      return;
+    }
+    if (typeof sensors === 'string') {
+      sensors = sensors.split(',');
+    }
+    if (typeof ranges === 'string') {
+      ranges = ranges.split(',');
+    }
+    for (var i = 0; i < ranges.length; i++) {
+      ranges[i] = ranges[i].split(';');
+    }
+    if (typeof colors === 'string') {
+      colors = colors.split(',');
+    }
+    const now = Date.now();
+    const expired = now - samplePeriod;
+    sensors.forEach(i => {
+      const o = { ts: now, value: this._sensorData.sensors[i][kValueRaw] };
+      if (typeof graph.dataPoints[i] !== 'object') {
+        graph.dataPoints[i] = [];
+      }
+      graph.dataPoints[i].push(o);
+    });
+    Object.keys(graph.dataPoints).forEach(i => {
+      const size = graph.dataPoints[i].length;
+      if (size > samplePeriod) {
+        graph.dataPoints[i].splice(0, size - samplePeriod);
+      }
+    });
+
+    const canvas = createCanvas(w, h);
+    const ctx = canvas.getContext('2d');
+    ctx.globalAlpha = alpha;
+
+    let r = 0;
+    let px;
+    sensors.forEach(i => {
+      ctx.beginPath();
+      ctx.strokeStyle = '#' + colors[r];
+      px = 1;
+      ctx.moveTo(margin + px, h - margin);
+      const min = parseFloat(ranges[r][0]);
+      const max = parseFloat(ranges[r][1]);
+      let y;
+      graph.dataPoints[i].forEach(c => {
+        let v = parseFloat(c.value);
+        v = ((v - min) * 100) / (max - min);
+        y = (h - margin) - (h - margin) * v / 100;
+        ctx.lineTo(margin + px, y);
+        if (fill) {
+          ctx.lineTo(margin + px,  h - margin);
+          ctx.moveTo(margin + px, y);
+        }
+        px += lineWidth;
+      });
+      ctx.stroke();
+      r++;
+    });
+    this._graphs[id] = graph;
+
+    res.setHeader('content-type', 'image/png');
+    res.send(canvas.toBuffer('image/png'));
+  } catch (err) {
+    console.error(err);
+    res.send('Error');
+  }
+});
+app.get('/buttons', (req, res) => {
+  const buttons = decodeURIComponent(req.query.buttons || '');
+  try {
+    const data = JSON.parse(buttons);
+    let h = `
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="Page Watch buttons frame">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title></title>
+  <link rel="stylesheet" href="buttons-css?v=1">
+</head>
+<body>
+  <div class="wrap">`;
+data.forEach(i => {
+  h += `<div class="` + i.class + `" onclick='onAction(` + i.action + `)'>
+    <i class="fa fa-2x">`;
+  if (i.image) {
+    h += `<img src="` + i.image + `">`;
+  }
+  h += `</i><span class="label bottom">` + i.title + `</span></div>`;
+});
+h += `
+  </div>
+  <script src="buttons-js?v=1"></script>
+</body>
+</html>`;
+    res.setHeader('content-type', 'text/html');
+    res.send(h);
+  } catch(err) {
+    console.error(err);
+  }
+});
+app.get('/buttons-css', (req, res) => {
+  try {
+    const file = './css/component.css';
+    const css = readFile(file);
+    res.setHeader('content-type', 'text/css');
+    res.send(css);
+  } catch(err) {
+    console.error(err);
+  }
+});
+app.get('/buttons-js', (req, res) => {
+  try {
+    const file = './buttons-js/index.js';
+    const js = readFile(file);
+    res.setHeader('content-type', 'text/javascript');
+    res.send(js);
+  } catch (err) {
+    console.error(err);
+  }
+});
+
+const getDefaultGraphData = () => {
+  return {
+    lastUpdate: Date.now(),
+    dataPoints: {},
+  };
+};
 
 const server = app.listen(port, () => {
   console.log(`Page watch app listening at http://localhost:${port}`);
