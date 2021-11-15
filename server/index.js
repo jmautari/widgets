@@ -609,14 +609,19 @@ app.get('/buttons', (req, res) => {
   <meta http-equiv="Expires" content="0" />
   <title></title>
   <link rel="stylesheet" href="buttons-css?v=1">
+  <link rel="stylesheet" href="https://pro.fontawesome.com/releases/v5.13.0/css/all.css">
 </head>
 <body>
   <div class="wrap">`;
 data.forEach(i => {
   h += `<div class="` + i.class + `" onclick='onAction(` + i.action + `)'>
-    <i class="fa fa-2x">`;
+    <i class="ff fa-3x`;
   if (i.image) {
-    h += `<img src="` + i.image + `">`;
+    if (i.image.match(/fa\-/i)) {
+      h += ' ' + i.image + `">`;
+    } else {
+      h += `"><img src="` + i.image + `">`;
+    }
   }
   h += `</i><span class="label bottom">` + i.title + `</span></div>`;
 });

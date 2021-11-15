@@ -1,3 +1,5 @@
+/* https://codeconvey.com/metro-style-windows-8-css3-menu/ */
+
 @import url(http://fonts.googleapis.com/css?family=Yanone+Kaffeesatz:400,200);
 
 
@@ -5,10 +7,10 @@
 height: auto;
 float: left;
 }
-.fa{
+.ff{
 color:#FFFFFF;
 }
-.fa img {
+.ff img {
   max-width:96px;
   max-height:96px;
 }
@@ -57,6 +59,7 @@ transition: all .3s ease;
 .bottom{bottom: 5px;}
 .top{top: 5px;}
 
+.black{background: #333;}
 .red{background: #df0024;}
 .blue{ background: #00a9ec;}
 .orange{background: #ff9000;}
