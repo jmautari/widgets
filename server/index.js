@@ -614,7 +614,11 @@ app.get('/buttons', (req, res) => {
 <body>
   <div class="wrap">`;
 data.forEach(i => {
-  h += `<div class="` + i.class + `" onclick='onAction(` + i.action + `)'>
+  h += `<div class="` + i.class + `" `;
+  if (i.style) {
+    h += ` style="` + i.style + `" `;
+  }
+  h += `onclick='onAction(` + i.action + `)'>
     <i class="ff fa-3x`;
   if (i.image) {
     if (i.image.match(/fa\-/i)) {
