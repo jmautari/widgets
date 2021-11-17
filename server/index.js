@@ -560,7 +560,7 @@ app.get('/clock', (req, res) => {
   let x = align === 'left' ? 0 : align === 'center' ? w / 2 : w;
   const y = 0;
   try {
-    const clockText = getClock(format);
+    const clockText = getClock(decodeURIComponent(format));
     const canvas = createCanvas(w, h);
     const context = canvas.getContext('2d');
     const fontSize = parseInt(size) * 2;
