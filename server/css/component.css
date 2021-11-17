@@ -15,7 +15,6 @@ body { overflow:hidden; margin:8px 0 8px 8px;}
 }
 .wrap{
   height: 100vw;
-  /*float: left;*/
   width: 100vw;
   cursor: none;
 }
@@ -38,7 +37,6 @@ height: 95px;
 position: relative;
 cursor: pointer;
 transition: all .4s ease;
-user-drag: element;
 border: solid 2px transparent;
 text-align:center;
 line-height:100px;

@@ -58,7 +58,14 @@ function drag(e) {
 
 function move(e) {
   if (locked) {
-    let dx = unify(e).clientX - x0,
+    let dx = unify(e).clientX;
+    if (dx === x0) {  // Didn't swiped? Just return to resetting to first page.
+      x0 = null;
+      locked = false;
+      return;
+    }
+    dx -= x0;
+    let
       s = Math.sign(dx),
       f = +(s * dx / w).toFixed(2);
 
