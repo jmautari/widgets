@@ -261,13 +261,28 @@ const updateList = (fname) => {
 
 };
 const startProgram = (path) => {
-  if (!fs.existsSync(path)) {
-    console.error('Path %s does not exist', path);
+  let args = [];
+  const getProgramPath = (p) => {
+    const s = p.indexOf('"');
+    if (s === -1) {
+      return p;
+    }
+    const e = p.lastIndexOf('"');
+    if (e === -1) {
+      return p;
+    }
+    args = p.substr(e + 2).split(' ');
+    return p.substr(s + 1, e - 1);
+  };
+  const p = getProgramPath(path);
+  const cleanPath = p.replace(/\"/, '');
+  if (!fs.existsSync(cleanPath)) {
+    console.error('Path %s does not exist', cleanPath);
     return;
   }
-  console.log('Starting %s', path);
+  console.log('Starting %s with args %s', p, args);
   try {
-    execFile(path);
+    execFile(cleanPath, args);
     console.log('Process should be running now');
   } catch(err) {
     console.error('Could not start process. Err: %s', err);
@@ -320,10 +335,17 @@ msgHandler.on(kCmdWidgets,
   });
 msgHandler.on(kCmdButtons,
   (client, server, params) => {
-    if (params.action === kButtonsActivateProfile) {
-      activateFile('widgets_' + params.data.profile + '.json');
-    } else if (params.action === kButtonsActionStartProgram) {
-      startProgram(params.data.path);
+    const doAction = (p) => {
+      if (p.action === kButtonsActivateProfile) {
+        activateFile('widgets_' + p.data.profile + '.json');
+      } else if (p.action === kButtonsActionStartProgram) {
+        startProgram(p.data.path);
+      }
+    };
+    if (Array.isArray(params)) {
+      params.forEach(p => doAction(p));
+    } else {
+      doAction(params);
     }
   });
 msgHandler.on(kCmdAdmin,
@@ -612,28 +634,34 @@ app.get('/buttons', (req, res) => {
   <link rel="stylesheet" href="https://pro.fontawesome.com/releases/v5.13.0/css/all.css">
 </head>
 <body>
-  <div class="wrap">`;
-data.forEach(i => {
-  h += `<div class="` + i.class + `" `;
-  if (i.style) {
-    h += ` style="` + i.style + `" `;
-  }
-  h += `onclick='onAction(` + i.action + `)'>
-    <i class="ff fa-3x`;
-  if (i.image) {
-    if (i.image.match(/fa\-/i)) {
-      h += ' ' + i.image + `">`;
-    } else {
-      h += `"><img src="` + i.image + `">`;
-    }
-  }
-  h += `</i><span class="label bottom">` + i.title + `</span></div>`;
-});
-h += `
-  </div>
-  <script src="buttons-js?v=1"></script>
-</body>
-</html>`;
+  <div class="container">`;
+
+    Object.keys(data).forEach(index => {
+      const list = data[index];
+      h += `<div class="wrap">`;
+      h += `<div class="buttons">`;
+      list.forEach(i => {
+        h += `<div class="` + i.class + `" `;
+        if (i.style) {
+          h += ` style="` + i.style + `" `;
+        }
+        h += `onclick='onAction(` + i.action + `)'>
+          <i class="ff fa-3x`;
+        if (i.image) {
+          if (i.image.match(/fa\-/i)) {
+            h += ' ' + i.image + `">`;
+          } else {
+            h += `"><img src="` + i.image + `">`;
+          }
+        }
+        h += `</i><span class="label bottom">` + i.title + `</span></div>`;
+      });
+      h += '</div></div>';
+    });
+    h += `</div>
+      <script src="buttons-js?v=1"></script>
+    </body>
+    </html>`;
     res.setHeader('content-type', 'text/html');
     res.send(h);
   } catch(err) {

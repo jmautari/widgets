@@ -2,11 +2,28 @@
 
 @import url(http://fonts.googleapis.com/css?family=Yanone+Kaffeesatz:400,200);
 
-
-.wrap{
-height: auto;
-float: left;
+body { overflow:hidden; margin:8px 0 8px 8px;}
+.container {
+	--n: 1;
+	display: flex;
+	align-items: center;
+	overflow-y: hidden;
+	width: 100%;
+	width: calc(var(--n)*100%);
+	height: 100%; /*max-height: 100vh;*/
+	transform: translate(calc(var(--i, 0)/var(--n)*-100%));
 }
+.wrap{
+  height: 100vw;
+  /*float: left;*/
+  width: 100vw;
+  cursor: none;
+}
+.buttons {
+  width: 100%;
+  user-select: none;
+}
+
 .ff{
 color:#FFFFFF;
 }
@@ -70,16 +87,18 @@ transition: all .3s ease;
   background: url('http://lorempixel.com/200/95/people');
   background-position: -2px -2px;
 }
-.gray{
-  background: #5f5f5f;
-  animation: flip 6s linear infinite;
-  transform: rotateX(0deg);
-}
+.gray{background: #5f5f5f}
 .green-bright{background: #78d204;}
 .blue-nav{background: #25478e;}
 .redish{background: #fe0000;}
 .yellow{background: #d0d204;}
+.pink{background: #e75480}
+.white{background: #fff}
 
+.animated{
+  animation: flip 6s linear infinite;
+  transform: rotateX(0deg);
+}
 
 div[class^="icon"]{
 	width: 45px;
@@ -147,4 +166,3 @@ div[class^="icon"]{
     opacity: 0;
   }
 }
-
