@@ -100,21 +100,21 @@ const loadWidgetData = (data) => {
   includes.forEach(i => {
     const filename = kRootDir + '/widgets_' + i + '.json';
     if (!fs.existsSync(filename)) {
-      console.warn('File %s is not valid', filename);
-      return;
-    }
-    try {
-      const json = parseJson(readFile(filename));
-      if (!json) {
-        return;
-      }
-      json.widgets.forEach(w => {
-        if (typeof w.include === 'string') {
-          nestedIncludes.push(w.include);
+      console.warn('File %s is not valid and has been ignored', filename);
+    } else {
+      try {
+        const json = parseJson(readFile(filename));
+        if (!json) {
+          return;
         }
-      });
-    } catch(err) {
-      console.error('Could not parse %s', err);
+        json.widgets.forEach(w => {
+          if (typeof w.include === 'string') {
+            nestedIncludes.push(w.include);
+          }
+        });
+      } catch(err) {
+        console.error('Could not parse %s', err);
+      }
     }
   });
   nestedIncludes.forEach(i => {
@@ -307,6 +307,24 @@ const activateFile = (filename) => {
 const get1x1dot = () => {
   const filename = kRootDir + '/' + kDotFile;
   return fs.readFileSync(filename);
+};
+const getClock = (format) => {
+  const date = new Date();
+  const padLeft = (v) => {
+    const s = '00' + v;
+    return s.substr(-2);
+  };
+  const formatMap = {
+    MM: padLeft(date.getMonth() + 1, 2),
+    dd: padLeft(date.getDate(), 2),
+    yy: padLeft(date.getFullYear().toString().slice(-2)),
+    yyyy: date.getFullYear(),
+    hh: padLeft(date.getHours()),
+    mm: padLeft(date.getMinutes()),
+    ss: padLeft(date.getSeconds()),
+    br: '\n',
+  };
+  return format.replace(/MM|dd|yyyy|yy|hh|mm|ss|br/g, m => formatMap[m]);
 };
 
 fs.watch(kRootDir, { encoding: 'utf8' }, (eventType, filename) => {
@@ -530,6 +548,37 @@ app.get('/gauge', (req, res) => {
     res.send('Error');
   }
 });
+app.get('/clock', (req, res) => {
+  const format = req.query.format || 'MM/dd/yyyy';
+  const color = req.query.color || 'fff';
+  const shadowColor = req.query.shadowcolor || undefined;
+  const size = req.query.size || 32;
+  const fontName = req.query.fontname || 'Consolas';
+  const align = req.query.align || 'left';
+  const w = parseInt(req.query.w || kMaxWidth);
+  const h = parseInt(req.query.h || kMaxHeight);
+  let x = align === 'left' ? 0 : align === 'center' ? w / 2 : w;
+  const y = 0;
+  try {
+    const clockText = getClock(format);
+    const canvas = createCanvas(w, h);
+    const context = canvas.getContext('2d');
+    const fontSize = parseInt(size) * 2;
+    context.textBaseline = 'top';
+    context.font = 'bold ' + fontSize + 'pt ' + fontName;
+    context.textAlign = align;
+    if (shadowColor) {
+      context.fillStyle = '#' + shadowColor;
+      context.fillText(clockText, x + 4, 4, w);
+    }
+    context.fillStyle = '#' + color;
+    context.fillText(clockText, x, 0, w);
+    res.setHeader('content-type', 'image/png');
+    res.send(canvas.toBuffer('image/png'));
+  } catch (err) {
+    res.send('Error');
+  }
+});
 app.get('/graph', (req, res) => {
   const id = req.query.id || 0;
   let sensors = req.query.sensors || [];
@@ -684,7 +733,7 @@ app.get('/buttons-js', (req, res) => {
     const js = readFile(file);
     res.setHeader('content-type', 'text/javascript');
     res.send(js);
-  } catch (err) {
+  } catch(err) {
     console.error(err);
   }
 });
