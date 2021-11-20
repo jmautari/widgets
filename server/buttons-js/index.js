@@ -1,25 +1,13 @@
-let broadcastChannel;
+let _C;
+const broadcastChannel = new BroadcastChannel('buttons-channel');
+const bc = new BroadcastChannel('buttons-data');
+broadcastChannel.postMessage({ action: 'buttonsReady'});
 
 const onAction = (o) => {
   const audio = new Audio('media/click.wav');
   audio.play();
   broadcastChannel.postMessage(o);
 };
-
-const _C = document.querySelector('.container'),
-  N = _C.children.length, NF = 30,
-  TFN = {
-    'linear': function (k) { return k },
-    'ease-in': function (k, e = 1.675) {
-      return Math.pow(k, e)
-    },
-    'ease-out': function (k, e = 1.675) {
-      return 1 - Math.pow(1 - k, e)
-    },
-    'ease-in-out': function (k) {
-      return .5 * (Math.sin((k - .5) * Math.PI) + 1)
-    }
-  };
 
 let i = 0, x0 = null, locked = false, w, ini, fin, rID = null, anf;
 
@@ -86,18 +74,63 @@ function move(e) {
 
 function size() { w = window.innerWidth };
 
-size();
-_C.style.setProperty('--n', N);
+bc.onmessage = (m) => {
+  const data = JSON.parse(m.data.buttons);
+  let h = '<div class="container">';
+  Object.keys(data).forEach(index => {
+    const list = data[index];
+    h += `<div class="wrap">`;
+    h += `<div class="buttons">`;
+    list.forEach(i => {
+      const textStyle = i.textStyle || '';
+      h += `<div class="` + i.class + `" `;
+      if (i.style) {
+        h += ` style="` + i.style + `" `;
+      }
+      h += `onclick='onAction(` + i.action + `)'>
+          <i class="ff fa-3x`;
+      if (i.image) {
+        if (i.image.match(/fa\-/i)) {
+          h += ' ' + i.image + `">`;
+        } else {
+          h += `"><img src="` + i.image + `">`;
+        }
+      }
+      h += `</i><span class="label bottom ` + textStyle + `">` + i.title + `</span></div>`;
+    });
+    h += '</div></div>';
+  });
+  h += '</div>';
+  const o = document.getElementById('buttons-container');
+  console.log(o.innerHTML);
+  o.innerHTML = h;
 
-addEventListener('resize', size, false);
+  size();
 
-_C.addEventListener('mousedown', lock, false);
-_C.addEventListener('touchstart', lock, false);
+  _C = document.querySelector('.container'),
+    N = _C.children.length, NF = 30,
+    TFN = {
+      'linear': function (k) { return k },
+      'ease-in': function (k, e = 1.675) {
+        return Math.pow(k, e)
+      },
+      'ease-out': function (k, e = 1.675) {
+        return 1 - Math.pow(1 - k, e)
+      },
+      'ease-in-out': function (k) {
+        return .5 * (Math.sin((k - .5) * Math.PI) + 1)
+      }
+    };
+  _C.style.setProperty('--n', N);
 
-_C.addEventListener('mousemove', drag, false);
-_C.addEventListener('touchmove', drag, false);
+  addEventListener('resize', size, false);
 
-_C.addEventListener('mouseup', move, false);
-_C.addEventListener('touchend', move, false);
+  _C.addEventListener('mousedown', lock, false);
+  _C.addEventListener('touchstart', lock, false);
 
-broadcastChannel = new BroadcastChannel('buttons-channel');
+  _C.addEventListener('mousemove', drag, false);
+  _C.addEventListener('touchmove', drag, false);
+
+  _C.addEventListener('mouseup', move, false);
+  _C.addEventListener('touchend', move, false);
+};

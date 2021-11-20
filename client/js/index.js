@@ -6,7 +6,10 @@ let host;
 let websocketUrl;
 let sensorData;
 let broadcastChannel;
+let bc;
 let ws;
+let buttons = {};
+let buttonsReady = false;
 
 const kRetryIntervalMs = 1000;  // Retry connection every second if disconnected.
 
@@ -115,15 +118,23 @@ const getImageTag = (o) => {
   return '<img src="' + uri + '" style="' + getPosCSS(o.position) +
     '" update-interval="' + updateInterval + '">';
 };
+const getHashCode = (s) => {
+  for (var i = 0, h = 0; i < s.length; i++) {
+    h = Math.imul(31, h) + s.charCodeAt(i) | 0;
+  }
+  return h;
+};
 const getButtonsData = (o) => {
-  return encodeURIComponent(JSON.stringify(o.buttons));
+  return JSON.stringify(o.buttons);
 };
 const getButtons = (o) => {
-  return '<div class="buttons-wrapper">' +
-    '<iframe src="' + o.uri + '&buttons=' +
-    getButtonsData(o) + '" frameborder="0" ' +
-    'style="width:' + o.position.w + ';height:' + o.position.h + '">' + 
-    '</iframe></div>';
+  buttons[o.id] = getButtonsData(o);
+  return '<div class="buttons-wrapper" style="top:' + 
+    o.position.y + ';position:absolute;">' +
+    '<iframe src="' + o.uri + '&id=' + o.id + 
+    '&h=' + getHashCode(buttons[o.id]) +
+    '" frameborder="0" style="width:' + o.position.w + 
+    ';height:' + o.position.h + '"></iframe></div>';
 };
 const createWidget = (o) => {
   const type = getType(o.uri);
@@ -235,6 +246,9 @@ const connect = () => {
           stopUpdater();
           container.setAttribute(kWidgetData, htmlEncoded);
           container.innerHTML = html;
+          if (buttonsReady) {
+            sendButtonsData();
+          }
           startUpdater();
         }
       } else if (cmd == kSensorData) {
@@ -260,14 +274,26 @@ const start = () => {
   clearTimer();
   reconnectTimer = window.setInterval(reconnect, kRetryIntervalMs);
 };
+const sendButtonsData = () => {
+  Object.keys(buttons).forEach(i => {
+    bc.postMessage({ buttons: buttons[i] });
+  });
+};
 bootLoader(() => {
   hostName = config.host || 'mr-pc';
   port = config.port || 30000;
   host = hostName + ':' + port;
   websocketUrl = 'ws://' + host;
 
+  bc = new BroadcastChannel('buttons-data');
   broadcastChannel = new BroadcastChannel('buttons-channel');
   broadcastChannel.onmessage = (m) => {
+    console.log('message received: %s', JSON.stringify(m));
+    if (m.data.action === 'buttonsReady') {
+      buttonsReady = true;
+      sendButtonsData();
+      return;
+    }
     if (!ws) {
       console.error('WS not defined');
       return;

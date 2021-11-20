@@ -13,6 +13,7 @@ const kListFile = 'widgets_list.json';
 const kDotFile = '1x1.png';
 const kSensorsFile = 'sensors.json';
 const kRootDir = process.env.PW_ROOT || 'd:/backgrounds';
+const kCacheTime = 31557600;
 
 const kCmdWidgets = 'widgets';
 const kCmdAdmin = 'admin';
@@ -47,7 +48,12 @@ this._graphs = [];
 
 this._sensorData = undefined;
 
-app.use(express.static(kRootDir));
+app.use(express.static(kRootDir, {
+  maxAge: kCacheTime,
+  extensions: ["mp4", "gif"],
+  cacheControl: true,
+  immutable: true,
+}));
 app.use(express.static(__dirname + '/../client'));
 
 const parseJson = (s) => {
@@ -614,11 +620,13 @@ app.get('/graph', (req, res) => {
     const now = Date.now();
     const expired = now - samplePeriod;
     sensors.forEach(i => {
-      const o = { ts: now, value: this._sensorData.sensors[i][kValueRaw] };
-      if (typeof graph.dataPoints[i] !== 'object') {
-        graph.dataPoints[i] = [];
+      if (this._sensorData.sensors[i] && this._sensorData.sensors[i][kValueRaw]) {
+        const o = { ts: now, value: this._sensorData.sensors[i][kValueRaw] };
+        if (typeof graph.dataPoints[i] !== 'object') {
+          graph.dataPoints[i] = [];
+        }
+        graph.dataPoints[i].push(o);
       }
-      graph.dataPoints[i].push(o);
     });
     Object.keys(graph.dataPoints).forEach(i => {
       const size = graph.dataPoints[i].length;
@@ -667,7 +675,6 @@ app.get('/graph', (req, res) => {
 app.get('/buttons', (req, res) => {
   const buttons = decodeURIComponent(req.query.buttons || '');
   try {
-    const data = JSON.parse(buttons);
     let h = `
 <!doctype html>
 <html lang="en">
@@ -683,30 +690,9 @@ app.get('/buttons', (req, res) => {
   <link rel="stylesheet" href="https://pro.fontawesome.com/releases/v5.13.0/css/all.css">
 </head>
 <body>
-  <div class="container">`;
+  <div id="buttons-container">`;
 
-    Object.keys(data).forEach(index => {
-      const list = data[index];
-      h += `<div class="wrap">`;
-      h += `<div class="buttons">`;
-      list.forEach(i => {
-        h += `<div class="` + i.class + `" `;
-        if (i.style) {
-          h += ` style="` + i.style + `" `;
-        }
-        h += `onclick='onAction(` + i.action + `)'>
-          <i class="ff fa-3x`;
-        if (i.image) {
-          if (i.image.match(/fa\-/i)) {
-            h += ' ' + i.image + `">`;
-          } else {
-            h += `"><img src="` + i.image + `">`;
-          }
-        }
-        h += `</i><span class="label bottom">` + i.title + `</span></div>`;
-      });
-      h += '</div></div>';
-    });
+    
     h += `</div>
       <script src="buttons-js?v=1"></script>
     </body>

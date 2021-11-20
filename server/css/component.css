@@ -23,6 +23,8 @@ body { overflow:hidden; margin:8px 0 8px 8px;}
   user-select: none;
 }
 
+.black-text {color:#000!important;}
+
 .ff{
 color:#FFFFFF;
 }
@@ -86,7 +88,8 @@ transition: all .3s ease;
   background-position: -2px -2px;
 }
 .gray{background: #5f5f5f}
-.green-bright{background: #78d204;}
+.gray-light{background:#999999;}
+.lime{background: #78d204;}
 .blue-nav{background: #25478e;}
 .redish{background: #fe0000;}
 .yellow{background: #d0d204;}
