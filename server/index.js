@@ -4,7 +4,7 @@ const ws = require('ws');
 const { createCanvas } = require('canvas');
 const msgHandler = require('./lib/message_handler');
 const { basename } = require('path');
-const { execFile } = require("child_process")
+const { exec } = require("child_process")
 const app = express();
 const port = process.env.PW_PORT || 30000;
 const kJsonFile = 'widgets.json';
@@ -288,8 +288,15 @@ const startProgram = (path) => {
   }
   console.log('Starting %s with args %s', p, args);
   try {
-    execFile(cleanPath, args);
-    console.log('Process should be running now');
+    if (exec('"' + p + '" ' + args.join(' '), { detached: true }, (err) => {
+      if (err) {
+        console.log(err);
+      } else {
+        console.log('%s was closed', p);
+      }
+    })) {
+      console.log('Process should be running now');
+    }
   } catch(err) {
     console.error('Could not start process. Err: %s', err);
   }
