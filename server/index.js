@@ -266,19 +266,33 @@ const updateList = (fname) => {
   }
 
 };
+const replaceBackSlash = (i) => {
+  return i.replace(/\\/g, '/');
+};
 const startProgram = (path) => {
   let args = [];
   const getProgramPath = (p) => {
     const s = p.indexOf('"');
     if (s === -1) {
-      return p;
+      return replaceBackSlash(p);
     }
     const e = p.lastIndexOf('"');
     if (e === -1) {
-      return p;
+      return replaceBackSlash(p);
     }
     args = p.substr(e + 2).split(' ');
-    return p.substr(s + 1, e - 1);
+    p = p.substr(s + 1, e - 1);
+    console.log('p=%s', p);
+    return replaceBackSlash(p);
+  };
+  const getPath = (p) => {
+    const i = p.lastIndexOf('/');
+    if (i === -1) {
+      console.log('/ not found');
+      return p;
+    }
+    console.log('path=%s', p.substr(0, i));
+    return p.substr(0, i);
   };
   const p = getProgramPath(path);
   const cleanPath = p.replace(/\"/, '');
@@ -288,14 +302,12 @@ const startProgram = (path) => {
   }
   console.log('Starting %s with args %s', p, args);
   try {
-    if (exec('"' + p + '" ' + args.join(' '), { detached: true }, (err) => {
-      if (err) {
-        console.log(err);
-      } else {
-        console.log('%s was closed', p);
-      }
-    })) {
+    const dir = getPath(p);
+    const opt = { detached: true, cwd: dir, stdio: 'ignore' };
+    const proc = exec('"' + p + '" ' + args.join(' '), opt);
+    if (proc) {
       console.log('Process should be running now');
+      proc.unref();
     }
   } catch(err) {
     console.error('Could not start process. Err: %s', err);
