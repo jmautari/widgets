@@ -88,6 +88,7 @@ const loadWidgetData = (data) => {
   let nestedIncludes = [];
   const addInclude = (include) => {
     if (includes.indexOf(include) === -1) {
+      console.log('including %s', include);
       includes.push(include);
     } else {
       console.warn('Ignoring duplicated entry: %s', include);
@@ -116,6 +117,8 @@ const loadWidgetData = (data) => {
         json.widgets.forEach(w => {
           if (typeof w.include === 'string') {
             nestedIncludes.push(w.include);
+          } else if (typeof w.include === 'object') {
+            w.include.forEach(i => nestedIncludes.push(i));
           }
         });
       } catch(err) {

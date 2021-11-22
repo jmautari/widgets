@@ -10,6 +10,7 @@ let bc;
 let ws;
 let buttons = {};
 let buttonsReady = false;
+let lastOrientation = -1;
 
 const kRetryIntervalMs = 1000;  // Retry connection every second if disconnected.
 
@@ -202,6 +203,10 @@ const startUpdater = () => {
     }
   });
 };
+const requestWidgets = () => {
+  console.log('Requesting widgets');
+  ws.send(JSON.stringify({ cmd: kCmdWidgets }));
+};
 const stopUpdater = () => {
   const img = document.getElementsByTagName('img');
   const list = Array.prototype.slice.call(img);
@@ -222,8 +227,8 @@ const connect = () => {
       start();
     };
     ws.onopen = () => {
-      console.log('Connected, requesting widgets');
-      ws.send(JSON.stringify({ cmd: kCmdWidgets }));
+      console.log('Connected');
+      requestWidgets();
     };
     ws.onmessage = (msg) => {
       const json = JSON.parse(msg.data);
@@ -271,6 +276,29 @@ const reconnect = () => {
   }
 };
 const start = () => {
+  const o = screen.orientation || undefined;
+  console.log(o);
+  if (typeof o === 'undefined') {
+    if (typeof window.orientation !== 'undefined') {
+      lastOrientation = window.orientation;
+      window.addEventListener('orientationchange', function (event) {
+        if (lastOrientation !== window.orientation) {
+          lastOrientation = window.orientation;
+          document.location.reload();
+        }
+      });
+    } else {
+      console.log('Orientation detection not supported');
+    }
+  } else {
+    lastOrientation = screen.orientation.angle;
+    screen.orientation.addEventListener('change', function (event) {
+      if (lastOrientation !== screen.orientation.angle) {
+        lastOrientation = screen.orientation.angle;
+        requestWidgets();
+      }
+    });
+  }
   clearTimer();
   reconnectTimer = window.setInterval(reconnect, kRetryIntervalMs);
 };

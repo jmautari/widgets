@@ -2,7 +2,7 @@
 
 @import url(http://fonts.googleapis.com/css?family=Yanone+Kaffeesatz:400,200);
 
-body { overflow:hidden; margin:8px 0 8px 8px;}
+body {overflow:hidden; margin:8px 0 8px 8px;}
 .container {
 	--n: 1;
 	display: flex;
