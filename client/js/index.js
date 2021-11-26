@@ -209,9 +209,14 @@ const requestWidgets = () => {
 };
 const stopUpdater = () => {
   const img = document.getElementsByTagName('img');
-  const list = Array.prototype.slice.call(img);
-  if (list.length === 0)
+  const video = document.getElementsByTagName('video');
+  const img_list = Array.prototype.slice.call(img);
+  const video_list = Array.prototype.slice.call(video);
+  const list = Array.prototype.concat(img_list, video_list);
+  if (list.length === 0) {
     return;
+  }
+  console.log('Stopping %d items', list.length);
   list.forEach(i => {
     const interval = parseInt(i.getAttribute('update-interval'));
     if (interval > 0) {
@@ -242,7 +247,8 @@ const connect = () => {
         const widgetData = container.getAttribute(kWidgetData);
         const screen = getScreen();
         data.widgets.map(i => {
-          if (i.screen === screen) {
+          const enabled = typeof i.enabled === 'undefined' ? true : i.enabled;
+          if (enabled && i.screen === screen) {
             html += createWidget(i);
           }
         });
