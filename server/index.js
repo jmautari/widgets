@@ -4,7 +4,7 @@ const ws = require('ws');
 const { createCanvas } = require('canvas');
 const msgHandler = require('./lib/message_handler');
 const { basename } = require('path');
-const { exec } = require("child_process")
+const { exec, execFile } = require("child_process")
 const app = express();
 const port = process.env.PW_PORT || 30000;
 const kJsonFile = 'widgets.json';
@@ -14,6 +14,8 @@ const kDotFile = '1x1.png';
 const kSensorsFile = 'sensors.json';
 const kRootDir = process.env.PW_ROOT || 'd:/backgrounds';
 const kCacheTime = 31557600;
+const kPlaySoundProgram = kRootDir + '/playsound.exe';
+const kSensorsProgram = kRootDir + '/widget-sensors.exe';
 
 const kCmdWidgets = 'widgets';
 const kCmdAdmin = 'admin';
@@ -24,6 +26,7 @@ const kCmdButtons = 'buttons-action';
 
 const kButtonsActivateProfile = 'activateProfile';
 const kButtonsActionStartProgram = 'startProgram';
+const kButtonsActionPlaySound = 'playSound';
 
 const kValueRaw = 'valueRaw';
 const kSensorData = 'sensor-data';
@@ -316,6 +319,9 @@ const startProgram = (path) => {
     console.error('Could not start process. Err: %s', err);
   }
 };
+const playSound = (path) => {
+  startProgram('"' + kPlaySoundProgram + '" ' + path);
+};
 const activateFile = (filename) => {
   console.log('Activating %s', filename);
   const src = kRootDir + '/' + filename;
@@ -381,11 +387,14 @@ msgHandler.on(kCmdWidgets,
   });
 msgHandler.on(kCmdButtons,
   (client, server, params) => {
+    console.log(params);
     const doAction = (p) => {
       if (p.action === kButtonsActivateProfile) {
         activateFile('widgets_' + p.data.profile + '.json');
       } else if (p.action === kButtonsActionStartProgram) {
         startProgram(p.data.path);
+      } else if (p.action === kButtonsActionPlaySound) {
+        playSound(p.data.path);
       }
     };
     if (Array.isArray(params)) {
@@ -473,6 +482,7 @@ app.get('/sensors', (req, res) => {
     context.fillStyle = '#' + color;
     context.fillText(val, x, y, w);
     res.setHeader('content-type', 'image/png');
+    res.setHeader('cache-control', 'max-age=0, must-revalidate');
     res.send(canvas.toBuffer('image/png'));
   } catch(err) {
     res.send('Error');
@@ -503,6 +513,7 @@ app.get('/text', (req, res) => {
     context.fillStyle = '#' + color;
     context.fillText(text, x, 0, w);
     res.setHeader('content-type', 'image/png');
+    res.setHeader('cache-control', 'max-age=0, must-revalidate');
     res.send(canvas.toBuffer('image/png'));
   } catch (err) {
     res.send('Error');
@@ -571,6 +582,7 @@ app.get('/gauge', (req, res) => {
     }
     ctx.stroke();
     res.setHeader('content-type', 'image/png');
+    res.setHeader('cache-control', 'max-age=0, must-revalidate');
     res.send(canvas.toBuffer('image/png'));
   } catch (err) {
     res.send('Error');
@@ -602,6 +614,7 @@ app.get('/clock', (req, res) => {
     context.fillStyle = '#' + color;
     context.fillText(clockText, x, 0, w);
     res.setHeader('content-type', 'image/png');
+    res.setHeader('cache-control', 'max-age=0, must-revalidate');
     res.send(canvas.toBuffer('image/png'));
   } catch (err) {
     res.send('Error');
@@ -688,6 +701,7 @@ app.get('/graph', (req, res) => {
     this._graphs[id] = graph;
 
     res.setHeader('content-type', 'image/png');
+    res.setHeader('cache-control', 'max-age=0, must-revalidate');
     res.send(canvas.toBuffer('image/png'));
   } catch (err) {
     console.error(err);
@@ -720,6 +734,7 @@ app.get('/buttons', (req, res) => {
     </body>
     </html>`;
     res.setHeader('content-type', 'text/html');
+    res.setHeader('cache-control', 'max-age=0, must-revalidate');
     res.send(h);
   } catch(err) {
     console.error(err);
@@ -730,6 +745,7 @@ app.get('/buttons-css', (req, res) => {
     const file = './css/component.css';
     const css = readFile(file);
     res.setHeader('content-type', 'text/css');
+    res.setHeader('cache-control', 'max-age=0, must-revalidate');
     res.send(css);
   } catch(err) {
     console.error(err);
@@ -740,6 +756,7 @@ app.get('/buttons-js', (req, res) => {
     const file = './buttons-js/index.js';
     const js = readFile(file);
     res.setHeader('content-type', 'text/javascript');
+    res.setHeader('cache-control', 'max-age=0, must-revalidate');
     res.send(js);
   } catch(err) {
     console.error(err);
@@ -755,22 +772,43 @@ const getDefaultGraphData = () => {
 
 const server = app.listen(port, () => {
   console.log(`Page watch app listening at http://localhost:${port}`);
-  const filename = kRootDir + '/' + kSensorsFile;
-  if (fs.existsSync(filename)) {
-    setInterval(() => {
-      try {
-        const data = readFile(filename);
-        if (!data) {
-          console.warn('Could not ready sensors file');
-          return;
+  if (fs.existsSync(kSensorsProgram)) {
+    console.log('Trying to start %s for sensor monitoring', kSensorsProgram);
+    try {
+      const monitor = execFile(kSensorsProgram, { cwd: kRootDir }, (error, stdout, stderr) => {
+        if (error) {
+          console.log(error);
+          throw error;
         }
-        const json = parseJson(data);
-        this._sensorData = json;
-      } catch(err) {
-        console.error('JSON parsing error: %s', err);
+        console.log(stdout);
+      });
+      if (monitor) {
+        console.log('Sensor monitoring started');
+        const filename = kRootDir + '/' + kSensorsFile;
+        if (fs.existsSync(filename)) {
+          setInterval(() => {
+            try {
+              const data = readFile(filename);
+              if (!data) {
+                console.warn('Could not ready sensors file');
+                return;
+              }
+              const json = parseJson(data);
+              this._sensorData = json;
+            } catch (err) {
+              console.error('JSON parsing error: %s', err);
+            }
+            sendSensorData();
+          }, 1000);
+        }
+      } else {
+        throw { program: kSensorsProgram };
       }
-      sendSensorData();
-    }, 1000);
+    } catch(error) {
+      console.log('Cannot start program. %s', error);
+    }
+  } else {
+    console.log('%s not found. Sensor monitoring is disabled', kSensorsProgram);
   }
 });
 server.on('upgrade', (request, socket, head) => {
