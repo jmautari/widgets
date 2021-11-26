@@ -3,9 +3,11 @@ const broadcastChannel = new BroadcastChannel('buttons-channel');
 const bc = new BroadcastChannel('buttons-data');
 broadcastChannel.postMessage({ action: 'buttonsReady'});
 
-const onAction = (o) => {
-  const audio = new Audio('media/click.wav');
-  audio.play();
+const onAction = (silent, o) => {
+  if (!silent) {
+    const audio = new Audio('media/click.wav');
+    audio.play();
+  }
   broadcastChannel.postMessage(o);
 };
 
@@ -83,11 +85,12 @@ bc.onmessage = (m) => {
     h += `<div class="buttons">`;
     list.forEach(i => {
       const textStyle = i.textStyle || '';
+      const silent = i.silent || false;
       h += `<div class="` + i.class + `" `;
       if (i.style) {
         h += ` style="` + i.style + `" `;
       }
-      h += `onclick='onAction(` + i.action + `)'>
+      h += `onclick='onAction(${silent},` + i.action + `)'>
           <i class="ff fa-3x`;
       if (i.image) {
         if (i.image.match(/fa\-/i)) {
