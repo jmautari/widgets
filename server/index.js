@@ -566,6 +566,9 @@ app.get('/gauge', (req, res) => {
       ctx.arc(cx, cy, radius, cc ? PI - startAngle : startAngle, cc ? PI - endAngle : endAngle);
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = outerWidth;
+      if (dotted) {
+        ctx.setLineDash([2, 4]);
+      }
       ctx.stroke();
     }
 
@@ -775,7 +778,8 @@ const server = app.listen(port, () => {
   if (fs.existsSync(kSensorsProgram)) {
     console.log('Trying to start %s for sensor monitoring', kSensorsProgram);
     try {
-      const monitor = execFile(kSensorsProgram, { cwd: kRootDir }, (error, stdout, stderr) => {
+      const monitor = execFile(kSensorsProgram, [ kRootDir ],
+          { cwd: kRootDir }, (error, stdout, stderr) => {
         if (error) {
           console.log(error);
           throw error;
