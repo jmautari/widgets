@@ -116,6 +116,7 @@ const getImageTag = (o) => {
   // Assume image if not handled.
   const uri = '//' + host + '/' + o.uri;
   const updateInterval = o.update || 0;
+  const ts = Date.now();
   return '<img src="' + uri + '" style="' + getPosCSS(o.position) +
     '" update-interval="' + updateInterval + '">';
 };

@@ -48,6 +48,7 @@ this._sockets = [];
 this._connId = 1;
 this._watching = false;
 this._graphs = [];
+this._vars = [];
 
 this._sensorData = undefined;
 
@@ -99,31 +100,48 @@ const loadWidgetData = (data) => {
   };
   data.widgets.forEach(w => {
     const include = w.include || undefined;
-    if (typeof include === 'undefined') {
-      return;
-    } else if (typeof include === 'string') {
+    if (typeof include === 'string') {
       addInclude(include);
     } else if (typeof include === 'object') {
       include.forEach(i => addInclude(i));
     }
   });
+  if (typeof data.vars !== 'undefined') {
+    if (typeof data.vars === 'string') {
+      data.vars = [ data.vars ];
+    }
+    data.vars.forEach(i => addInclude(i));
+  } else {
+    data.vars = [];
+  }
   includes.forEach(i => {
     const filename = kRootDir + '/widgets_' + i + '.json';
     if (!fs.existsSync(filename)) {
       console.warn('File %s is not valid and has been ignored', filename);
     } else {
       try {
-        const json = parseJson(readFile(filename));
+        let json = parseJson(readFile(filename));
         if (!json) {
           return;
         }
-        json.widgets.forEach(w => {
-          if (typeof w.include === 'string') {
-            nestedIncludes.push(w.include);
-          } else if (typeof w.include === 'object') {
-            w.include.forEach(i => nestedIncludes.push(i));
-          }
-        });
+        if (typeof json.vars === 'undefined') {
+          json.vars = [];
+        }
+        const addNestedIncludes = (o) => {
+          o.forEach(w => {
+            if (typeof w.include === 'string') {
+              nestedIncludes.push(w.include);
+            } else if (typeof w.include === 'object') {
+              w.include.forEach(i => nestedIncludes.push(i));
+            }
+          });
+        };
+        if (typeof json.widgets === 'object') {
+          addNestedIncludes(json.widgets);
+        }
+        if (typeof json.vars === 'object') {
+          addNestedIncludes(json.vars);
+        }
       } catch(err) {
         console.error('Could not parse %s', err);
       }
@@ -144,11 +162,17 @@ const loadWidgetData = (data) => {
       if (!json) {
         return;
       }
-      json.widgets.forEach(w => data.widgets.push(w));
+      if (typeof json.widgets === 'object') {
+        json.widgets.forEach(w => data.widgets.push(w));
+      }
+      if (typeof json.vars === 'object') {
+        json.vars.forEach(w => data.vars.push(w));
+      }
     } catch (err) {
       console.error('Could not parse %s', err);
     }
-  });  return data;
+  });
+  return data;
 };
 const sendResponse = (cmd, err, server) => {
   try {
@@ -184,6 +208,32 @@ const sendFile = (cmd, file, id) => {
         const jsonData = parseJson(data);
         if (!jsonData) {
           return;
+        }
+        const includeVars = (f) => {
+          const filename = kRootDir + '/widgets_' + f + '.json';
+          if (!fs.existsSync(filename)) {
+            console.warn('File %s is not valid', filename);
+            return;
+          }
+          console.log('Including vars %s', filename);
+          try {
+            const json = parseJson(readFile(filename));
+            if (!json) {
+              return;
+            }
+            Object.keys(json).forEach(k => {
+              //console.log('[%s]=%s', k, json[k]);
+              this._vars[k] = json[k];
+            });
+          } catch (err) {
+            console.error('Could not parse %s', err);
+          }
+        };
+        const vars = jsonData.vars || undefined;
+        if (typeof vars === 'string') {
+          includeVars(vars);
+        } else if (typeof vars === 'object') {
+          vars.forEach(v => includeVars(v));
         }
         if (id !== undefined) {
           let server;
@@ -327,9 +377,12 @@ const activateFile = (filename) => {
   const src = kRootDir + '/' + filename;
   const dst = kRootDir + '/' + kJsonFile;
   try {
-    const json = parseJson(readFile(src));
+    let json = parseJson(readFile(src));
     if (!json) {
       return;
+    }
+    if (typeof json.vars === 'undefined') {
+      json.vars = [];
     }
     const data = loadWidgetData(json);
     fs.writeFileSync(dst, JSON.stringify(data));
@@ -359,6 +412,24 @@ const getClock = (format) => {
     br: '\n',
   };
   return format.replace(/MM|dd|yyyy|yy|hh|mm|ss|br/g, m => formatMap[m]);
+};
+const parseVars = (o) => {
+  const vars = this._vars;
+  Object.keys(o).forEach(k => {
+    const r = /\$\{([^\}]+)/g;
+    const m  = r.exec(o[k]);
+    if (m && m.length > 0) {
+      if (typeof o[k] !== 'undefined') {
+        const v = vars[m[1]] || undefined;
+        //if (m[1] === 'gpu_name') {
+          //console.log('Parsing [%s]=%s', m[1], v);
+        //}
+        if (typeof v !== 'undefined') {
+          o[k] = v;
+        }
+      }
+    }
+  });
 };
 
 fs.watch(kRootDir, { encoding: 'utf8' }, (eventType, filename) => {
@@ -447,6 +518,7 @@ app.get('/', (req, res) => {
   res.send('Page Watch')
 });
 app.get('/sensors', (req, res) => {
+  parseVars(req.query);
   const sensor = req.query.sensor;
   const value = req.query.value;
   const color = req.query.color || 'fff';
@@ -489,6 +561,8 @@ app.get('/sensors', (req, res) => {
   }
 });
 app.get('/text', (req, res) => {
+  console.log('handling /text');
+  parseVars(req.query);
   const text = req.query.text || 'Text here';
   const color = req.query.color || 'fff';
   const shadowColor = req.query.shadowcolor || undefined;
@@ -520,6 +594,7 @@ app.get('/text', (req, res) => {
   }
 });
 app.get('/gauge', (req, res) => {
+  parseVars(req.query);
   const PI = Math.PI;
   const PI2 = PI * 2;
   const outerWidth = 30;
@@ -592,6 +667,7 @@ app.get('/gauge', (req, res) => {
   }
 });
 app.get('/clock', (req, res) => {
+  parseVars(req.query);
   const format = req.query.format || 'MM/dd/yyyy';
   const color = req.query.color || 'fff';
   const shadowColor = req.query.shadowcolor || undefined;
@@ -624,6 +700,7 @@ app.get('/clock', (req, res) => {
   }
 });
 app.get('/graph', (req, res) => {
+  parseVars(req.query);
   const id = req.query.id || 0;
   let sensors = req.query.sensors || [];
   let ranges = req.query.ranges || [];
@@ -657,6 +734,9 @@ app.get('/graph', (req, res) => {
     }
     const now = Date.now();
     const expired = now - samplePeriod;
+    if (typeof sensors !== 'object') {
+      sensors = [ sensors ];
+    }
     sensors.forEach(i => {
       if (this._sensorData.sensors[i] && this._sensorData.sensors[i][kValueRaw]) {
         const o = { ts: now, value: this._sensorData.sensors[i][kValueRaw] };
@@ -712,6 +792,7 @@ app.get('/graph', (req, res) => {
   }
 });
 app.get('/buttons', (req, res) => {
+  parseVars(req.query);
   const buttons = decodeURIComponent(req.query.buttons || '');
   try {
     let h = `
@@ -744,6 +825,7 @@ app.get('/buttons', (req, res) => {
   }
 });
 app.get('/buttons-css', (req, res) => {
+  parseVars(req.query);
   try {
     const file = './css/component.css';
     const css = readFile(file);
@@ -755,6 +837,7 @@ app.get('/buttons-css', (req, res) => {
   }
 });
 app.get('/buttons-js', (req, res) => {
+  parseVars(req.query);
   try {
     const file = './buttons-js/index.js';
     const js = readFile(file);
