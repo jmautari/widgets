@@ -1,7 +1,7 @@
 body {
   margin: 0;
   padding: 0;
-  background-color: #000;
+  background-color: transparent;
 }
 
 #container {
@@ -15,18 +15,27 @@ body {
 }
 
 #header {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   padding: 10px;
   min-height: 40px;
+  z-index: 10;
 }
 
-#header select {
+#header span {
+  color: #fff;
+}
+
+#header select#files {
   width: 300px;
   min-width: 300px;
 }
 
+#header select#screen {
+  width: 50px;
+  min-width: 50px;
+}
 #header button {
   margin-left: 20px;
 }
@@ -46,6 +55,46 @@ body {
   min-height: calc(100% - 62px);
   max-height: 1px;
 }
+
+#inner-container {
+  position: absolute;
+  overflow: auto;
+  top: 40px;
+  min-width: calc(100% - 1px);
+  height: calc(100% - 40px);
+  z-index: 9;
+}
+
+#viewport {
+  border: 1px dotted #fff;
+  position: relative;
+  top: 0px;
+  left: 0px;
+  color: #fff;
+  overflow: auto;
+}
+
+#properties {
+  position: absolute;
+  background-color: #fff;
+  padding: 10px;
+  top: 200px;
+  left: 200px;
+  width: 120px;
+  height: 145px;
+  display: none;
+  z-index: 10000;
+}
+
+#properties>span {
+  min-width: 40px;
+  display: inline-block;
+}
+
+#properties .pos {
+  width: 60px;
+}
+
 
 video.fsvideo {
   width: 100%;

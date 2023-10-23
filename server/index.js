@@ -1,10 +1,13 @@
 const express = require('express');
 const fs = require('fs');
 const ws = require('ws');
+const https = require('https');
+const path = require('path');
 const { createCanvas } = require('canvas');
 const msgHandler = require('./lib/message_handler');
 const { basename } = require('path');
-const { exec, execFile } = require("child_process")
+const { exec, execFile } = require("child_process");
+const { urlencoded } = require('express');
 const app = express();
 const port = process.env.PW_PORT || 30000;
 const kJsonFile = 'widgets.json';
@@ -20,9 +23,11 @@ const kSensorsProgram = kRootDir + '/widget-sensors.exe';
 const kCmdWidgets = 'widgets';
 const kCmdAdmin = 'admin';
 const kCmdLoadFile = 'load-file';
+const kCmdLoadWidgetData = 'load-widget-data';
 const kCmdSaveJson = 'save-json';
 const kCmdActivateFile = 'activate-file';
 const kCmdButtons = 'buttons-action';
+const kCmdSavePos = 'save-widget-pos';
 
 const kButtonsActivateProfile = 'activateProfile';
 const kButtonsActionStartProgram = 'startProgram';
@@ -44,13 +49,22 @@ const kGraphColors = [
 const kMaxWidth = 488;
 const kMaxHeight = 488;
 
-this._sockets = [];
-this._connId = 1;
-this._watching = false;
-this._graphs = [];
-this._vars = [];
+class ServerState {
+  _sockets = [];
+  _connId = 1;
+  _watching = false;
+  _graphs = [];
+  _vars = [];
+  _monitoring = [];
+  _sensorData = undefined;
+};
 
-this._sensorData = undefined;
+const serverState = new ServerState();
+this._opts = {
+  sensors_file: false,
+  sensors_socket: 'localhost',
+  port: 30001
+};
 
 app.use(express.static(kRootDir, {
   maxAge: kCacheTime,
@@ -59,11 +73,15 @@ app.use(express.static(kRootDir, {
   immutable: true,
 }));
 app.use(express.static(__dirname + '/../client'));
+app.set('etag', false);
 
 const parseJson = (s) => {
   try {
-    return JSON.parse(s);
+    if (typeof s === 'Buffer')
+      return s.toJSON();
+    return JSON.parse(s.toString());
   } catch (err) {
+    console.error('JSON', s.toString());
     console.error('Could not parse JSON. Err: %s', err);
     return undefined;
   }
@@ -88,11 +106,12 @@ const onFileSaved = (filename, server) => {
   sendFile(kCmdAdmin, kListFile, server);
 };
 const loadWidgetData = (data) => {
+  serverState._vars = {};
   let includes = [];
   let nestedIncludes = [];
   const addInclude = (include) => {
     if (includes.indexOf(include) === -1) {
-      console.log('including %s', include);
+      console.log('Adding %s to include list', include);
       includes.push(include);
     } else {
       console.warn('Ignoring duplicated entry: %s', include);
@@ -102,18 +121,10 @@ const loadWidgetData = (data) => {
     const include = w.include || undefined;
     if (typeof include === 'string') {
       addInclude(include);
-    } else if (typeof include === 'object') {
+    } else if (Array.isArray(include)) {
       include.forEach(i => addInclude(i));
     }
   });
-  if (typeof data.vars !== 'undefined') {
-    if (typeof data.vars === 'string') {
-      data.vars = [ data.vars ];
-    }
-    data.vars.forEach(i => addInclude(i));
-  } else {
-    data.vars = [];
-  }
   includes.forEach(i => {
     const filename = kRootDir + '/widgets_' + i + '.json';
     if (!fs.existsSync(filename)) {
@@ -131,15 +142,15 @@ const loadWidgetData = (data) => {
           o.forEach(w => {
             if (typeof w.include === 'string') {
               nestedIncludes.push(w.include);
-            } else if (typeof w.include === 'object') {
+            } else if (Array.isArray(w.include)) {
               w.include.forEach(i => nestedIncludes.push(i));
             }
           });
         };
-        if (typeof json.widgets === 'object') {
+        if (Array.isArray(json.widgets)) {
           addNestedIncludes(json.widgets);
         }
-        if (typeof json.vars === 'object') {
+        if (Array.isArray(json.vars)) {
           addNestedIncludes(json.vars);
         }
       } catch(err) {
@@ -150,29 +161,94 @@ const loadWidgetData = (data) => {
   nestedIncludes.forEach(i => {
     addInclude(i);
   });
+  if (typeof data.vars !== 'undefined') {
+    if (typeof data.vars === 'string') {
+      data.vars = [ data.vars ];
+    }
+    if (Array.isArray(data.vars)) {
+      data.vars.forEach(i => addInclude(i));
+    }
+  } else {
+    data.vars = [];
+  }
+  if (typeof data.constants === 'undefined') {
+    data.constants = {};
+  }
   includes.forEach(i => {
     const filename = kRootDir + '/widgets_' + i + '.json';
     if (!fs.existsSync(filename)) {
       console.warn('File %s is not valid', filename);
       return;
     }
-    console.log('Including file %s', filename);
+    console.log('Including file %s (%s)', i, filename);
+    let widget_index;
     try {
       const json = parseJson(readFile(filename));
       if (!json) {
         return;
       }
-      if (typeof json.widgets === 'object') {
-        json.widgets.forEach(w => data.widgets.push(w));
+      widget_index = 1;
+      if (Array.isArray(json.widgets)) {
+        json.widgets.forEach(w => {
+          w.id = `${i}_${widget_index}`;  // nth index in this file
+          data.widgets.push(w);
+          widget_index++;
+        });
       }
-      if (typeof json.vars === 'object') {
+      console.log(`File ${i} has ${widget_index} widgets`);
+      if (Array.isArray(json.vars)) {
         json.vars.forEach(w => data.vars.push(w));
+      }
+      if (typeof json.constants === 'object') {
+        Object.keys(json.constants).forEach(k => {
+          // console.log('%s=%s', k, json.constants[k]);
+          data.constants[k] = json.constants[k];
+        });
       }
     } catch (err) {
       console.error('Could not parse %s', err);
     }
   });
+  if (typeof data.vars === 'string') {
+    includeVars(data.vars);
+  } else if (Array.isArray(data.vars)) {
+    data.vars.forEach(v => includeVars(v));
+  }
+  console.log('callnig parseVars');
+  data.widgets.forEach(w => {
+    if (w.uri) {
+      w.uri = replaceVars(w.uri);
+      // console.log('w.uri', w.uri);
+    }
+  });
+  // console.log(data);
   return data;
+};
+const getVars = (json) => {
+  Object.keys(json).forEach(k => {
+    const v = encodeURIComponent(json[k]);
+    // console.log('[%s]=%s', k, json[k]);
+    serverState._vars[k] = v;
+  });
+};
+const includeVars = (f) => {
+  const fname = 'widgets_' + f + '.json';
+  const filename = kRootDir + '/' + fname;
+  if (!fs.existsSync(filename)) {
+    console.warn('File %s is not valid', filename);
+    return;
+  }
+  // console.log('Including vars %s', filename);
+  try {
+    const json = parseJson(readFile(filename));
+    if (!json) {
+      return;
+    }
+    getVars(json);
+    startMonitoring(fname);
+  } catch (err) {
+    console.error('Could not parse %s', err);
+  }
 };
 const sendResponse = (cmd, err, server) => {
   try {
@@ -180,21 +256,54 @@ const sendResponse = (cmd, err, server) => {
       { binary: false });
   } catch(err) {
     console.error('Error sending error response. Err: %s', err);
+    setTimeout(() => {
+      sendResponse(cmd, err, server);
+    }, 1000);
   }
 };
 const sendSensorData = () => {
-  if (typeof this._sensorData !== 'object') {
+  if (typeof serverState._sensorData !== 'object') {
+    console.log(`No sensor data (${typeof serverState._sensorData})`);
     return;
   }
   try {
-    for (const [client, server] of Object.entries(this._sockets)) {
+    for (const [client, server] of Object.entries(serverState._sockets)) {
       if (server) {
-        server.send(JSON.stringify({ cmd: kSensorData, result: 200, data: this._sensorData }),
+        server.send(JSON.stringify({ cmd: kSensorData, result: 200, data: serverState._sensorData }),
           { binary: false });
       }
     }
   } catch (err) {
     console.log('Could not send sensor data. Err: %s', err);
+    // Keep retrying every second in case of parsing error.
+    /*
+    setTimeout(() => {
+      sendSensorData();
+    }, 1000);
+    */
+  }
+};
+const sendData = (cmd, jsonData, id) => {
+  console.log('Sending data');
+  try {
+    const str = JSON.stringify({ cmd: cmd, result: 200, data: jsonData });
+    if (id !== undefined) {
+      let server;
+      if (typeof id === 'object') {
+        server = id;
+      } else {
+        server = serverState._sockets[id];
+      }
+      server.send(str, { binary: false });
+      return;
+    }
+    for (const [client, server] of Object.entries(serverState._sockets)) {
+      if (server) {
+        server.send(str, { binary: false });
+      }
+    }
+  } catch(err) {
+    console.log('Could not read file. Err: %s', err);
   }
 };
 const sendFile = (cmd, file, id) => {
@@ -209,44 +318,28 @@ const sendFile = (cmd, file, id) => {
         if (!jsonData) {
           return;
         }
-        const includeVars = (f) => {
-          const filename = kRootDir + '/widgets_' + f + '.json';
-          if (!fs.existsSync(filename)) {
-            console.warn('File %s is not valid', filename);
-            return;
-          }
-          console.log('Including vars %s', filename);
-          try {
-            const json = parseJson(readFile(filename));
-            if (!json) {
-              return;
-            }
-            Object.keys(json).forEach(k => {
-              //console.log('[%s]=%s', k, json[k]);
-              this._vars[k] = json[k];
-            });
-          } catch (err) {
-            console.error('Could not parse %s', err);
-          }
-        };
         const vars = jsonData.vars || undefined;
         if (typeof vars === 'string') {
           includeVars(vars);
-        } else if (typeof vars === 'object') {
+        } else if (Array.isArray(vars)) {
           vars.forEach(v => includeVars(v));
+        }
+        if (typeof jsonData.constants === 'object') {
+          // Object.keys(jsonData.constants).forEach(k => console.log('%s=%s', k, jsonData.constants[k]));
+          getVars(jsonData.constants);
         }
         if (id !== undefined) {
           let server;
           if (typeof id === 'object') {
             server = id;
           } else {
-            server = this._sockets[id];
+            server = serverState._sockets[id];
           }
           server.send(JSON.stringify({ cmd: cmd, result: 200, data: jsonData }),
             { binary: false });
           return;
         }
-        for (const [client, server] of Object.entries(this._sockets)) {
+        for (const [client, server] of Object.entries(serverState._sockets)) {
           if (server) {
             server.send(JSON.stringify({ cmd: cmd, result: 200, data: jsonData }),
               { binary: false });
@@ -267,7 +360,8 @@ const readFile = (filename) => {
   try {
     return fs.readFileSync(filename);
   } catch(err) {
-    console.error(err);
+    if (err.toString().indexOf('EBUSY') == -1)
+      console.error(err);
   }
   return undefined;
 };
@@ -372,8 +466,17 @@ const startProgram = (path) => {
 const playSound = (path) => {
   startProgram('"' + kPlaySoundProgram + '" ' + path);
 };
+const saveCurrentProfile = (filename) => {
+  try {
+    fs.writeFileSync(kRootDir + '/.current', filename);
+    console.log('Current profile %s saved to .current file', filename);
+  } catch(e) {
+    console.log('Could not save profile as %s', filename);
+  }
+};
 const activateFile = (filename) => {
   console.log('Activating %s', filename);
+  saveCurrentProfile(filename);
   const src = kRootDir + '/' + filename;
   const dst = kRootDir + '/' + kJsonFile;
   try {
@@ -385,7 +488,7 @@ const activateFile = (filename) => {
       json.vars = [];
     }
     const data = loadWidgetData(json);
-    fs.writeFileSync(dst, JSON.stringify(data));
+    fs.writeFileSync(dst, JSON.stringify(data, null, 2));
     updateList(filename);
   } catch(err) {
     console.error('Could not activate file %s. Err: %s', filename, err);
@@ -413,52 +516,142 @@ const getClock = (format) => {
   };
   return format.replace(/MM|dd|yyyy|yy|hh|mm|ss|br/g, m => formatMap[m]);
 };
+const replaceVars = (o) => {
+  const vars = serverState._vars;
+  const r = /\$\{([^\}]*)./;
+  let m;
+  do {
+    m  = r.exec(o);
+    if (m && m.length > 0) {
+      if (typeof vars[m[1]] !== 'undefined') {
+        const v = vars[m[1]];
+        if (typeof v !== 'undefined') {
+          o = o.replace(r, v);
+        } else {
+          o = o.replace(r, '');
+        } 
+      } else {
+        o = o.replace(r, '');
+      }
+    }
+  } while (m && m.length > 0);
+  return o;
+};
 const parseVars = (o) => {
-  const vars = this._vars;
+  const vars = serverState._vars;
   Object.keys(o).forEach(k => {
     const r = /\$\{([^\}]+)/g;
     const m  = r.exec(o[k]);
     if (m && m.length > 0) {
-      if (typeof o[k] !== 'undefined') {
-        const v = vars[m[1]] || undefined;
-        //if (m[1] === 'gpu_name') {
-          //console.log('Parsing [%s]=%s', m[1], v);
-        //}
-        if (typeof v !== 'undefined') {
-          o[k] = v;
+      if (typeof o !== 'undefined') {
+        if (typeof vars[m[1]] !== 'undefined') {
+          const v = vars[m[1]];
+          if (typeof v !== 'undefined') {
+            o[k] = v;
+          }
         }
       }
     }
   });
 };
+const startMonitoring = (f) => {
+  if (serverState._monitoring.indexOf(f) !== -1) return;
+  console.log('Monitoring vars file', f);
+  serverState._monitoring.push(f);
+};
 
 fs.watch(kRootDir, { encoding: 'utf8' }, (eventType, filename) => {
-  if (!this._watching) {
-    this._watching = true;
+  if (!serverState._watching) {
+    serverState._watching = true;
     return;
   }
-  if (eventType === 'change' && filename && filename === kJsonFile) {
-    sendFile(kCmdWidgets, kJsonFile);
+  if (filename && eventType === 'change') {
+    if (filename === kJsonFile) {
+      sendFile(kCmdWidgets, kJsonFile);
+    } else if (serverState._monitoring.indexOf(filename) !== -1) {
+      console.log('Vars file', filename, ' has changed. Reloading data');
+      const current_profile = getCurrentProfile();
+      if (current_profile && current_profile.length > 0)
+        activateFile(current_profile);
+    }
   }
-  this._watching = false;
+  serverState._watching = false;
 });
+
+const updateFile = (file, index, pos) => {
+  const { x, y, w, h } = pos;
+  try {
+    const data = JSON.parse(fs.readFileSync(file));
+    const e = data.widgets || undefined;
+    if (!e) return false;
+    const i = index - 1;
+    if (e.length < i) return false;
+    e[i].position.x = x === 'auto' ? x : `${x}px`;
+    e[i].position.y = y === 'auto' ? y : `${y}px`;
+    e[i].position.w = w === 'auto' ? w : `${w}px`;
+    e[i].position.h = h === 'auto' ? h : `${h}px`;
+    try {
+      fs.copyFileSync(file, file + '.old');
+    } catch(err) {
+      console.log('Could not save backup file. Aborting save operation.', err);
+      return false;
+    }
+    try {
+      fs.writeFileSync(file, JSON.stringify(data, null, 2));
+    } catch(err) {
+      console.log('Could not update widgets file. Aborting save operation.', err);
+      return false;
+    }
+    console.log('File', file, 'updated successfully');
+    return true;
+  } catch(err) {
+    console.log('Error parsing file %s. %s', file, err);
+  }
+};
+const getCurrentProfile = () => {
+  const fname = kRootDir + '/.current';
+  try {
+    if (!fs.existsSync(fname)) return '';
+    return fs.readFileSync(fname);
+  } catch(e) {
+    console.log('Could not read .current file', e);
+    return '';
+  }
+}
 
 msgHandler.on(kCmdWidgets,
   (client, server) => {
     if (client.connId === undefined) {
-      client.connId = this._connId++;
+      client.connId = serverState._connId++;
       console.log('Adding socket %d', client.connId);
-      this._sockets[client.connId] = server;
-      this._sockets[client.connId].on('close', () => {
+      serverState._sockets[client.connId] = server;
+      serverState._sockets[client.connId].on('close', () => {
         console.log('Disconnecting socket %d', client.connId);
-        this._sockets[client.connId] = undefined;
+        serverState._sockets[client.connId] = undefined;
       });
     }
     sendFile(kCmdWidgets, kJsonFile, client.connId);
   });
+msgHandler.on(kCmdSavePos,
+  (client, server, params) => {
+    const widget_id = params.id.split('_');
+    const {x, y, w, h} = params.pos;
+    const file = widget_id[0];
+    const index = widget_id[1];
+    const filename = kRootDir + '/' + `widgets_${file}.json`;
+    let widget_index = 1;
+    console.log(`Saving widget ${index} pos x:${x} y:${y} w:${w} h:${h} to file ${filename}`);
+    if (updateFile(filename, index, params.pos)) {
+      sendData(kCmdSavePos, 'OK', server);
+      return;
+    }
+    //const current_profile = getCurrentProfile();
+    //console.log(`current_profile=${current_profile}`);
+    sendData(kCmdSavePos, `Could not update file ${filename}`, server);
+  });
 msgHandler.on(kCmdButtons,
   (client, server, params) => {
-    console.log(params);
+    //console.log(params);
     const doAction = (p) => {
       if (p.action === kButtonsActivateProfile) {
         activateFile('widgets_' + p.data.profile + '.json');
@@ -477,34 +670,49 @@ msgHandler.on(kCmdButtons,
 msgHandler.on(kCmdAdmin,
   (client, server) => {
     const filename = kRootDir + '/' + kListFile;
-    if (!fs.existsSync(filename)) {
-      // Copy current widgets.json as widgets_default.json
-      const src = kRootDir + '/' + kJsonFile;
-      const dst = kRootDir + '/' + kDefaultJsonFile;
-      try {
-        fs.copyFileSync(src, dst);
-      } catch(err) {
-        sendResponse(kCmdAdmin, 500, server);
-        return;
-      }
-      try {
-        // Create widgets list file
-        fs.writeFileSync(filename, JSON.stringify(
-          {
-            list: [
-              { filename: kDefaultJsonFile, selected: true }
-            ]
-          }));
-      } catch(err) {
-        sendResponse(kCmdAdmin, 500, server);
-        return;
-      }
+    try {
+      // Create widgets list file
+      let list = [];
+      list.push({ filename: 'widgets_default.json', selected: false });
+      const files = fs.readdirSync(kRootDir);
+      files.forEach(file => {
+        if (path.extname(file) === '.json' &&
+            file !== 'widgets_default.json' &&
+            file.indexOf('widgets_') === 0 &&
+            file !== kListFile) {
+          list.push({ filename: file, selected: false });
+        }
+      });
+      let widget_list = { list };
+      fs.writeFileSync(filename, JSON.stringify(widget_list));
+    } catch(err) {
+      sendResponse(kCmdAdmin, 500, server);
+      return;
     }
     sendFile(kCmdAdmin, kListFile, server);
   });
 msgHandler.on(kCmdLoadFile,
   (client, server, params) => {
     sendFile(kCmdLoadFile, params.filename, server);
+  });
+msgHandler.on(kCmdLoadWidgetData,
+  (client, server, params) => {
+    const src = kRootDir + '/' + params.filename;
+    console.log('Loading %s', src);
+    try {
+      let json = parseJson(readFile(src));
+      if (!json) {
+        console.log('Error loading %s', src);
+        return;
+      }
+      if (typeof json.vars === 'undefined') {
+        json.vars = [];
+      }
+      const data = loadWidgetData(json);
+      sendData(kCmdLoadWidgetData, data, server);
+    } catch (err) {
+      console.log('Error loading widget data', err);
+    }
   });
 msgHandler.on(kCmdSaveJson,
   (client, server, params) => {
@@ -518,6 +726,7 @@ app.get('/', (req, res) => {
   res.send('Page Watch')
 });
 app.get('/sensors', (req, res) => {
+  //console.log('req.query', JSON.stringify(req.query));
   parseVars(req.query);
   const sensor = req.query.sensor;
   const value = req.query.value;
@@ -531,13 +740,14 @@ app.get('/sensors', (req, res) => {
   const h = parseInt(req.query.h || kMaxHeight);
   let x = align === 'left' ? 0 : align === 'center' ? w / 2 : w;
   const y = 0;
+  //console.log('sensor', sensor);
   try {
-    if (typeof this._sensorData !== 'object') {
+    if (typeof serverState._sensorData !== 'object') {
       res.setHeader('content-type', 'image/png');
       res.send(get1x1dot());
       return;
     }
-    let val = this._sensorData.sensors[sensor][value];
+    let val = serverState._sensorData.sensors[sensor][value];
     const canvas = createCanvas(w, h);
     const context = canvas.getContext('2d');
     const fontSize = parseInt(size) * 2;
@@ -553,15 +763,14 @@ app.get('/sensors', (req, res) => {
     }
     context.fillStyle = '#' + color;
     context.fillText(val, x, y, w);
-    res.setHeader('content-type', 'image/png');
-    res.setHeader('cache-control', 'max-age=0, must-revalidate');
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'no-store');
     res.send(canvas.toBuffer('image/png'));
   } catch(err) {
     res.send('Error');
   }
 });
 app.get('/text', (req, res) => {
-  console.log('handling /text');
   parseVars(req.query);
   const text = req.query.text || 'Text here';
   const color = req.query.color || 'fff';
@@ -576,7 +785,7 @@ app.get('/text', (req, res) => {
   try {
     const canvas = createCanvas(w, h);
     const context = canvas.getContext('2d');
-    const fontSize = parseInt(size) * 2;
+    const fontSize = parseInt(size) * 2 || 10;    
     context.textBaseline = 'top';
     context.font = 'bold ' + fontSize + 'pt ' + fontName;
     context.textAlign = align;
@@ -586,8 +795,8 @@ app.get('/text', (req, res) => {
     }
     context.fillStyle = '#' + color;
     context.fillText(text, x, 0, w);
-    res.setHeader('content-type', 'image/png');
-    res.setHeader('cache-control', 'max-age=0, must-revalidate');
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'no-store');
     res.send(canvas.toBuffer('image/png'));
   } catch (err) {
     res.send('Error');
@@ -602,6 +811,7 @@ app.get('/gauge', (req, res) => {
   const sensor = req.query.sensor;
   const value = req.query.value;
   const color = req.query.color || 'fff';
+  const bgcolor = req.query.bgcolor || 'eee';
   const dotted = parseInt(req.query.dotted || 0);
   const outline = parseInt(req.query.outline || 1);
   const angle = 1.0 - ((req.query.startangle || 360.0) / 360.0);
@@ -616,12 +826,12 @@ app.get('/gauge', (req, res) => {
   const cy = h / 2;
   const radius = cx - 2 * (outerWidth - innerWidth);
   try {
-    if (typeof this._sensorData !== 'object') {
+    if (typeof serverState._sensorData !== 'object') {
       res.setHeader('content-type', 'image/png');
       res.send(get1x1dot());
       return;
     }
-    let val = this._sensorData.sensors[sensor][value];
+    let val = serverState._sensorData.sensors[sensor][value];
     const canvas = createCanvas(w, h);
     const ctx = canvas.getContext('2d');
     ctx.globalAlpha = 0.5;
@@ -632,6 +842,8 @@ app.get('/gauge', (req, res) => {
     const percent = (val - min) / (max - min);
     const endAngle = PI2 + PI * (1.0 - angle);
     const startAngle = angle * PI;
+    if (startAngle < endAngle) return;
+
     const endPercentAngle = !cc ?
       startAngle + (endAngle - startAngle) * percent :
       startAngle - (endAngle - startAngle) * percent;
@@ -639,7 +851,7 @@ app.get('/gauge', (req, res) => {
     if (outline) {
       ctx.beginPath();
       ctx.arc(cx, cy, radius, cc ? PI - startAngle : startAngle, cc ? PI - endAngle : endAngle);
-      ctx.strokeStyle = '#fff';
+      ctx.strokeStyle = '#' + bgcolor;
       ctx.lineWidth = outerWidth;
       if (dotted) {
         ctx.setLineDash([2, 4]);
@@ -651,7 +863,7 @@ app.get('/gauge', (req, res) => {
     ctx.globalAlpha = 1.0;
     ctx.arc(cx, cy, radius, cc ? PI - startAngle : startAngle, cc ? PI - endPercentAngle : endPercentAngle);
     ctx.strokeStyle = '#' + color;
-    ctx.lineWidth = innerWidth;
+    ctx.lineWidth = outerWidth;
     if (rounded) {
       ctx.lineCap = 'round';
     }
@@ -659,11 +871,112 @@ app.get('/gauge', (req, res) => {
       ctx.setLineDash([2, 4]);
     }
     ctx.stroke();
-    res.setHeader('content-type', 'image/png');
-    res.setHeader('cache-control', 'max-age=0, must-revalidate');
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'no-store');
     res.send(canvas.toBuffer('image/png'));
   } catch (err) {
     res.send('Error');
+  }
+});
+app.get('/cache', (req, res) => {
+  parseVars(req.query);
+  const sendDotFile = () => {
+    console.log('Sending file %s', file);
+    res.setHeader('Cache-Control', 'no-store');
+    res.sendFile(kRootDir + '/dot.png');
+  };
+  const sendText = (kCmdLoadWidgetData, loadWidgetData(params.filename), server)
+  const sendFile = (file) => {
+    // res.setHeader('Content-Type', 'image/png');
+    if (fs.existsSync(file)) {
+      console.log('Sending file %s', file);
+      res.setHeader('Cache-Control', 'no-store');
+      res.sendFile(file);
+    } else {
+      sendDotFile();
+    }
+    res.status(200);
+  };
+  const uri = req.query.uri || undefined;
+  if (typeof uri === 'undefined') {
+    sendDotFile();
+    return;
+  }
+  const dir = kRootDir + '/cache/images';
+  if (!fs.existsSync(dir)) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+    } catch(e) {
+      console.error('Could not create cache dir at %s', dir);
+      res.status(500);
+      return;
+    }
+  }
+  parseVars(uri);
+  const re = /[^a-z0-9]+/gi;
+  const file = dir + '/' + uri.replace(re, '-');
+  // console.log('Caching %s to %s', uri, file);
+  if (!fs.existsSync(file) && uri.indexOf('$') === -1) {
+    const tempFile = file + '.tmp';
+    const stream = fs.createWriteStream(tempFile);
+    const request = https.get(uri, function(response) {
+      if (response.statusCode !== 200) {
+        console.error('Download of %s returned %d', uri, response.statusCode);
+        stream.end();
+        try {
+          fs.unlinkSync(tempFile);
+        } catch(e) {
+          console.error('Error deleting file. Err:', e);
+        }
+        sendDotFile();
+        return;
+      }
+      response.pipe(stream);
+
+      stream.on("finish", () => {
+        console.log('finish');
+        stream.close();
+        if (fs.existsSync(tempFile)) {
+          const fsize = fs.statSync(tempFile).size;
+          if (fsize > 0) {
+            try {
+              console.log('Renaming file %s to %s', tempFile, file);
+              fs.renameSync(tempFile, file);
+            } catch(err) {
+              fs.unlinkSync(tempFile);
+              console.error('Could not rename file %s to %s', tempFile, file, ' Err:', err);
+              sendFile(kRootDir + '/dot.png');
+              return;
+            }
+            console.log("Download of %s done. Sending %d bytes", uri, fsize);
+            sendFile(file);
+          } else {
+            console.error('Invalid file size. Deleting %s', tempFile);
+            fs.unlinkSync(tempFile);
+          }
+        } else if (fs.existsSync(file)) {
+          try {
+            if (fs.statSync(file).size > 0) {
+              sendFile(file);
+            } else {
+              console.error('Invalid file size. Deleting %s', tempFile);
+              fs.unlinkSync(file);
+            }
+          } catch(e) {
+            sendDotFile();
+            return;
+          }
+        }
+      }).on('error', () => {
+        console.log('error');
+        fs.unlink(file);
+      });
+    });
+    request.on('error', (err) => {
+      fs.unlink(file);
+    });
+  } else {
+    sendFile(file);
   }
 });
 app.get('/clock', (req, res) => {
@@ -692,8 +1005,8 @@ app.get('/clock', (req, res) => {
     }
     context.fillStyle = '#' + color;
     context.fillText(clockText, x, 0, w);
-    res.setHeader('content-type', 'image/png');
-    res.setHeader('cache-control', 'max-age=0, must-revalidate');
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'no-store');
     res.send(canvas.toBuffer('image/png'));
   } catch (err) {
     res.send('Error');
@@ -713,9 +1026,9 @@ app.get('/graph', (req, res) => {
   const samplePeriod = w - margin * 2;
   const lineWidth = req.query.lineWidth || 1;
   const fill = req.query.fill || false;
-  let graph = this._graphs[id] || getDefaultGraphData();
+  let graph = serverState._graphs[id] || getDefaultGraphData();
   try {
-    if (typeof this._sensorData !== 'object') {
+    if (typeof serverState._sensorData !== 'object') {
       res.setHeader('content-type', 'image/png');
       res.send(get1x1dot());
       return;
@@ -738,8 +1051,8 @@ app.get('/graph', (req, res) => {
       sensors = [ sensors ];
     }
     sensors.forEach(i => {
-      if (this._sensorData.sensors[i] && this._sensorData.sensors[i][kValueRaw]) {
-        const o = { ts: now, value: this._sensorData.sensors[i][kValueRaw] };
+      if (serverState._sensorData.sensors[i] && serverState._sensorData.sensors[i][kValueRaw]) {
+        const o = { ts: now, value: serverState._sensorData.sensors[i][kValueRaw] };
         if (typeof graph.dataPoints[i] !== 'object') {
           graph.dataPoints[i] = [];
         }
@@ -781,10 +1094,10 @@ app.get('/graph', (req, res) => {
       ctx.stroke();
       r++;
     });
-    this._graphs[id] = graph;
+    serverState._graphs[id] = graph;
 
-    res.setHeader('content-type', 'image/png');
-    res.setHeader('cache-control', 'max-age=0, must-revalidate');
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'no-store');
     res.send(canvas.toBuffer('image/png'));
   } catch (err) {
     console.error(err);
@@ -817,8 +1130,8 @@ app.get('/buttons', (req, res) => {
       <script src="buttons-js?v=1"></script>
     </body>
     </html>`;
-    res.setHeader('content-type', 'text/html');
-    res.setHeader('cache-control', 'max-age=0, must-revalidate');
+    res.setHeader('Content-Type', 'text/html');
+    res.setHeader('Cache-Control', 'no-store');
     res.send(h);
   } catch(err) {
     console.error(err);
@@ -829,8 +1142,8 @@ app.get('/buttons-css', (req, res) => {
   try {
     const file = './css/component.css';
     const css = readFile(file);
-    res.setHeader('content-type', 'text/css');
-    res.setHeader('cache-control', 'max-age=0, must-revalidate');
+    res.setHeader('Content-Type', 'text/css');
+    res.setHeader('Cache-Control', 'no-store');
     res.send(css);
   } catch(err) {
     console.error(err);
@@ -841,8 +1154,8 @@ app.get('/buttons-js', (req, res) => {
   try {
     const file = './buttons-js/index.js';
     const js = readFile(file);
-    res.setHeader('content-type', 'text/javascript');
-    res.setHeader('cache-control', 'max-age=0, must-revalidate');
+    res.setHeader('Content-Type', 'text/javascript');
+    res.setHeader('Cache-Control', 'no-store');
     res.send(js);
   } catch(err) {
     console.error(err);
@@ -856,9 +1169,32 @@ const getDefaultGraphData = () => {
   };
 };
 
+const createSensorsClient = () => {
+  const server = 'ws://' + this._opts.sensors_socket + ':' + this._opts.port;
+  console.log(`Connecting to ${server}`);
+  const s = new ws.WebSocket(server);
+  s.on('open', function() {
+    console.log('Connection succeeded');
+    s.on('message', function(message) {
+      serverState._sensorData = parseJson(message);
+      // console.log(`Got message from ${server}: ${JSON.stringify(serverState._sensorData)}`);
+    });
+  });
+  this._sensorClient = s;
+};
+
+const requestSensorsData = () => {
+  try {
+    this._sensorClient.send('1');
+    sendSensorData();
+  } catch(err) {
+    console.log(`Error requesting data. Err: ${err}`);
+  }
+};
+
 const server = app.listen(port, () => {
   console.log(`Page watch app listening at http://localhost:${port}`);
-  if (fs.existsSync(kSensorsProgram)) {
+  if (this._opts.file && fs.existsSync(kSensorsProgram)) {
     console.log('Trying to start %s for sensor monitoring', kSensorsProgram);
     try {
       const monitor = execFile(kSensorsProgram, [ kRootDir ],
@@ -877,11 +1213,11 @@ const server = app.listen(port, () => {
             try {
               const data = readFile(filename);
               if (!data) {
-                console.warn('Could not ready sensors file');
+                //console.warn('Could not read sensors file');
                 return;
               }
               const json = parseJson(data);
-              this._sensorData = json;
+              serverState._sensorData = json;
             } catch (err) {
               console.error('JSON parsing error: %s', err);
             }
@@ -894,6 +1230,15 @@ const server = app.listen(port, () => {
     } catch(error) {
       console.log('Cannot start program. %s', error);
     }
+  } else if (this._opts.sensors_socket && this._opts.port) {
+    createSensorsClient();
+    setInterval(() => {
+      try {
+        requestSensorsData();
+      } catch (err) {
+        console.error('Error requesting sensors data. Error: %s', err);
+      }
+    }, 1000);
   } else {
     console.log('%s not found. Sensor monitoring is disabled', kSensorsProgram);
   }
