@@ -19,6 +19,8 @@ const kRootDir = process.env.PW_ROOT || 'd:/backgrounds';
 const kCacheTime = 31557600;
 const kPlaySoundProgram = kRootDir + '/playsound.exe';
 const kSensorsProgram = kRootDir + '/widget-sensors.exe';
+const kShutdownProgram = kRootDir + '/shutdown-browser.bat';
+const kStartBrowserProgram = kRootDir + '/start-browser.bat';
 
 const kCmdWidgets = 'widgets';
 const kCmdAdmin = 'admin';
@@ -57,6 +59,7 @@ class ServerState {
   _vars = [];
   _monitoring = [];
   _sensorData = undefined;
+  _fileReadInterval = 0;
 };
 
 const serverState = new ServerState();
@@ -104,6 +107,10 @@ wsServer.on('connection', (ws, wc) => {
 
 const onFileSaved = (filename, server) => {
   sendFile(kCmdAdmin, kListFile, server);
+};
+const shouldEval = (expr) => {
+  const r = /[\-\+\*\/]*/;
+  return r.test(expr);
 };
 const loadWidgetData = (data) => {
   serverState._vars = {};
@@ -216,9 +223,43 @@ const loadWidgetData = (data) => {
   }
   console.log('callnig parseVars');
   data.widgets.forEach(w => {
+    const px = /px/;
+    const tryEval = (d, v) => {
+      try {
+        if (px.test(d)) {
+          //console.log('expr', d, 'result', eval(v) + 'px');
+          return eval(v) + 'px';
+        }
+        
+        return eval(v);
+      } catch (err) {
+        return d;
+      }
+    };
     if (w.uri) {
       w.uri = replaceVars(w.uri);
       // console.log('w.uri', w.uri);
+    }
+    if (w.position) {
+      w.position.x = replaceVars(w.position.x);
+      w.position.y = replaceVars(w.position.y);
+      w.position.w = replaceVars(w.position.w);
+      w.position.h = replaceVars(w.position.h);
+
+      if (w.position.x && shouldEval(w.position.x))
+        w.position.x = tryEval(w.position.x, w.position.x.replace(px, ''));
+
+      if (w.position.y && shouldEval(w.position.y))
+        w.position.y = tryEval(w.position.y, w.position.y.replace(px, ''));
+
+      if (w.position.w && shouldEval(w.position.w))
+        w.position.w = tryEval(w.position.w, w.position.w.replace(px, ''));
+
+      if (w.position.h && shouldEval(w.position.h))
+        w.position.h = tryEval(w.position.h, w.position.h.replace(px, ''));
+    }
+    if (typeof w.id === 'undefined') {
+      console.log('Missing id for', w.uri);
     }
   });
   // console.log(data);
@@ -261,7 +302,11 @@ const sendResponse = (cmd, err, server) => {
     }, 1000);
   }
 };
-const sendSensorData = () => {
+const sendSensorData = (o) => {
+  if (typeof o !== 'undefined') {
+	  serverState._sensorData = parseJson(o);
+  }
+  
   if (typeof serverState._sensorData !== 'object') {
     console.log(`No sensor data (${typeof serverState._sensorData})`);
     return;
@@ -722,14 +767,58 @@ msgHandler.on(kCmdActivateFile,
   (client, server, params) => {
     activateFile(params.filename);
   });
+const base64UrlDecode = (input) => {
+  try {
+    let base64 = input.replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4 !== 0) base64 += '=';
+    return atob(base64);
+  } catch (err) {
+    return undefined;
+  }
+};
+const getTransform = (val, transform) => {
+  let fun = this._transforms[transform];
+  if (typeof fun === 'undefined') {
+    const code = base64UrlDecode(transform);
+    if (typeof code === 'undefined') return val;
+    fun = new Function('value', `${code}`);
+    this._transforms[transform] = fun;
+  }
+  try {
+    return fun(val);
+  } catch (err) {
+    return val;
+  }
+};
 app.get('/', (req, res) => {
   res.send('Page Watch')
+});
+app.get('/img', (req, res) => {
+  let uri = req.query.uri;
+  const value = req.query.value || 'value';
+  const sensor = req.query.sensor ? req.query.sensor.split(',') : [];
+  let x = 1;
+  sensor.forEach(i => {
+    if (typeof this._sensorData === 'object') {
+      let val = this._sensorData.sensors[i][value] || 'false';
+      if (typeof val !== 'undefined') {
+        const s = '$' + x;
+        uri = uri.replace(s, val);
+      }
+    }
+  });
+  const file = kRootDir + '/' + uri;
+  if (fs.existsSync(file)) {
+    res.setHeader('Cache-Control', 'no-store');
+    res.sendFile(file);
+  }
 });
 app.get('/sensors', (req, res) => {
   //console.log('req.query', JSON.stringify(req.query));
   parseVars(req.query);
   const sensor = req.query.sensor;
   const value = req.query.value;
+  const transform = req.query.transform || undefined;
   const color = req.query.color || 'fff';
   const shadowColor = req.query.shadowcolor || undefined;
   const size = req.query.size || 32;
@@ -754,6 +843,9 @@ app.get('/sensors', (req, res) => {
     if (type === 'int') {
       val = parseInt(val);
     }
+    if (typeof transform !== 'undefined') {
+      val = getTransform(val, transform);
+    }
     context.textBaseline = 'top';
     context.font = 'bold ' + fontSize + 'pt ' + fontName;
     context.textAlign = align;
@@ -767,7 +859,7 @@ app.get('/sensors', (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.send(canvas.toBuffer('image/png'));
   } catch(err) {
-    res.send('Error');
+    res.send('Error ' + err);
   }
 });
 app.get('/text', (req, res) => {
@@ -785,7 +877,7 @@ app.get('/text', (req, res) => {
   try {
     const canvas = createCanvas(w, h);
     const context = canvas.getContext('2d');
-    const fontSize = parseInt(size) * 2 || 10;    
+    const fontSize = parseInt(size) * 2 || 10;  
     context.textBaseline = 'top';
     context.font = 'bold ' + fontSize + 'pt ' + fontName;
     context.textAlign = align;
@@ -885,7 +977,7 @@ app.get('/cache', (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.sendFile(kRootDir + '/dot.png');
   };
-  const sendText = (kCmdLoadWidgetData, loadWidgetData(params.filename), server)
+  //const sendText = (kCmdLoadWidgetData, loadWidgetData(params.filename), server)
   const sendFile = (file) => {
     // res.setHeader('Content-Type', 'image/png');
     if (fs.existsSync(file)) {
@@ -1169,31 +1261,149 @@ const getDefaultGraphData = () => {
   };
 };
 
+tryConnectToWebsocketServer = () => {
+  const server = 'ws://' + this._opts.sensors_socket + ':' + this._opts.port;
+  console.log('Connecting to ' + server);
+  try {
+    const s = new ws.WebSocket(server, { handshakeTimeout: 0 });
+    s.on('open', function() {
+      s.close();
+      
+      openBrowserWindows();
+      startServerLoop();
+    });
+    s.on('error', function() {
+      console.log('Error connecting to websocket server at', server);
+      tryReconnectToWebsocketServer();
+    });
+  } catch (err) {
+    console.log('Could not open websocket client');
+    tryReconnectToWebsocketServer();
+  }
+};
+
+tryReconnectToWebsocketServer = () => {
+  setTimeout(() => {
+    console.log('Trying to reconnect to websocket server');
+    tryConnectToWebsocketServer();
+  }, 3000);
+};
+
+const openBrowserWindows = () => {
+  if (typeof this._sensorClient === 'undefined') {
+    console.log('No client');
+    return;
+  }
+  
+  if (fs.existsSync(kStartBrowserProgram)) {
+    console.log('Websocket server is back! Opening browser windows');
+    try {
+      const monitor = execFile(kStartBrowserProgram, [ kRootDir ],
+          { cwd: kRootDir }, (error, stdout, stderr) => {
+        if (error) {
+          console.log(error);
+          throw error;
+        }
+        console.log(stdout);
+      });
+    } catch (err) {
+      console.log('Error opening browser windows. Err: ', err);
+    }
+  } else {
+    console.log('No start browser program available');
+  }
+};
+
+const shutdownBrowserWindows = () => {
+  if (typeof this._sensorClient === 'undefined')
+    return;
+  
+  this._sensorClient = undefined;
+  if (fs.existsSync(kShutdownProgram)) {
+    console.log('Websocket server is gone. Shutting down browser windows');
+    try {
+      const monitor = execFile(kShutdownProgram, [ kRootDir ],
+          { cwd: kRootDir }, (error, stdout, stderr) => {
+        if (error) {
+          console.log(error);
+          throw error;
+        }
+        console.log(stdout);
+      });
+      if (monitor) {
+        // Enter loop and try to re-create the websocket client. If the client is
+        // created succesfully, re-open browser windows.
+        tryReconnectToWebsocketServer();
+      }
+    } catch (err) {
+      console.log('Error shutting down browser windows. Err: ', err);
+    }
+  } else {
+    console.log('No shutdown program available');
+  }
+};
+
+const startRequestData = () => {
+  if (typeof this._sensorInterval !== 'undefined') {
+    clearInterval(this._sensorInterval);
+    this._sensorInterval = undefined;
+  }
+  
+  this._sensorInterval = setInterval(() => {
+    if (typeof this._sensorClient === 'undefined')
+      return;
+   
+    try {
+      requestSensorsData();
+    } catch (err) {
+      console.error('Error requesting sensors data. Error: %s', err);
+    }
+  }, 1000);
+};
+
 const createSensorsClient = () => {
   const server = 'ws://' + this._opts.sensors_socket + ':' + this._opts.port;
   console.log(`Connecting to ${server}`);
-  const s = new ws.WebSocket(server);
-  s.on('open', function() {
-    console.log('Connection succeeded');
-    s.on('message', function(message) {
-      serverState._sensorData = parseJson(message);
-      // console.log(`Got message from ${server}: ${JSON.stringify(serverState._sensorData)}`);
+  this._sensorClient = undefined;
+  let self = this;
+  try {
+    const s = new ws.WebSocket(server);
+    s.on('open', function() {
+      console.log('Connection succeeded');
+      self._sensorClient = s;
+      openBrowserWindows();
+      
+      s.on('message', function(message) {
+        sendSensorData(message.toString());
+      });
+    
+      s.on('close', function() {
+        shutdownBrowserWindows();
+      });
     });
-  });
-  this._sensorClient = s;
+    s.on('error', function() {
+      console.log('Error connecting to websocket server at', server);
+      tryReconnectToWebsocketServer();
+    });
+  } catch (err) {
+    console.log('Could not open websocket client');
+    shutdownBrowserWindows();
+  }
 };
 
 const requestSensorsData = () => {
+  if (typeof this._sensorClient === 'undefined')
+    return;
+   
   try {
     this._sensorClient.send('1');
-    sendSensorData();
+    // sendSensorData();
   } catch(err) {
     console.log(`Error requesting data. Err: ${err}`);
   }
 };
 
-const server = app.listen(port, () => {
-  console.log(`Page watch app listening at http://localhost:${port}`);
+const startServerLoop = () => {
   if (this._opts.file && fs.existsSync(kSensorsProgram)) {
     console.log('Trying to start %s for sensor monitoring', kSensorsProgram);
     try {
@@ -1209,7 +1419,10 @@ const server = app.listen(port, () => {
         console.log('Sensor monitoring started');
         const filename = kRootDir + '/' + kSensorsFile;
         if (fs.existsSync(filename)) {
-          setInterval(() => {
+          if (typeof serverState._fileReadInterval !== 'undefined')
+            clearInterval(serverState._fileReadInterval);
+            
+          serverState._fileReadInterval = setInterval(() => {
             try {
               const data = readFile(filename);
               if (!data) {
@@ -1232,16 +1445,15 @@ const server = app.listen(port, () => {
     }
   } else if (this._opts.sensors_socket && this._opts.port) {
     createSensorsClient();
-    setInterval(() => {
-      try {
-        requestSensorsData();
-      } catch (err) {
-        console.error('Error requesting sensors data. Error: %s', err);
-      }
-    }, 1000);
+    startRequestData();
   } else {
     console.log('%s not found. Sensor monitoring is disabled', kSensorsProgram);
   }
+};
+
+const server = app.listen(port, () => {
+  console.log(`Page watch app listening at http://localhost:${port}`);
+  startServerLoop();
 });
 server.on('upgrade', (request, socket, head) => {
   wsServer.handleUpgrade(request, socket, head, socket => {
