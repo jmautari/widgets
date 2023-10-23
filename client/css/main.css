@@ -71,7 +71,7 @@ body {
   top: 0px;
   left: 0px;
   color: #fff;
-  overflow: auto;
+  overflow: hidden;
 }
 
 #properties {
