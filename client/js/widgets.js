@@ -22,6 +22,7 @@ const kVideo = 'video';
 const kYoutube = 'youtube';
 const kYoutubeShare = 'youtube_share';
 const kButtons = 'buttons';
+const kTwitch = 'twitch';
 
 // IPC commands
 const kCmdWidgets = 'widgets';
@@ -39,6 +40,9 @@ const kParamScreen = 'screen';
 const kRtss = 'rtss=>process';
 const kSteam = 'steam=>app';
 const kGame = 'game=>poster';
+const kObsStreaming = 'obs=>streaming';
+
+const kTwitchChannel = 'pepperoni_tv';
 
 // The minimum playback rate.
 const kMinPlaybackRate = 0.1;
@@ -82,6 +86,8 @@ const getType = (u) => {
     return kYoutubeShare;
   } else if (u.match(/buttons/)) {
     return kButtons;
+  } else if (u.match(/twitch/)) {
+    //return kTwitch;
   }
   return undefined;
 };
@@ -146,6 +152,9 @@ const getYoutubeTag = (o, share) => {
     'allow="autoplay; encrypted-media;" allowfullscreen>' +
     '</iframe></div>';
 };
+const getTwitchTag = (o) => {
+  return '<iframe width="848" height="480" style="left:0; top: 0; position: absolute; z-index:10000;" src="https://dashboard.twitch.tv/u/pepperoni_tv/stream-manager"></iframe>';
+};
 const getImageTag = (o) => {
   // Assume image if not handled.
   //console.log('parsing uri', o.uri);
@@ -187,8 +196,23 @@ const createWidget = (o) => {
     return getYoutubeTag(o, type === kYoutubeShare);
   } else if (type === kButtons) {
     return getButtons(o);
+  } else if (type == kTwitch) {
+    //return getTwitchTag(o);
   }
   return getImageTag(o);
+};
+const checkTwitch = () => {
+  if (document.getElementById('twitch')) {
+    console.log("Creating twitch player");
+    const opt = {
+      width: 848,
+      height: 480,
+      channel: kTwitchChannel,
+      parent : ["localhost"]
+    };
+    const player = new Twitch.Player("twitch", opt);
+    player.setVolume(0.0);
+  }
 };
 const startUpdater = () => {
   console.log('startUpdater');
@@ -280,6 +304,9 @@ const isSteam = () => {
   //console.log('sensorData.sensors[kSteam]["value"]', sensorData.sensors[kSteam]["value"]);
   return sensorData.sensors[kSteam]["value"] > 0;
 };
+const isObsStreaming = () => {
+  return sensorData.sensors[kObsStreaming]["value"] > 0;
+};
 const hasProfile = (profile) => {
   if (currentProfile && currentProfile.length > 0 && currentProfile === profile) {
     //console.log('hasProfile for', profile);
@@ -297,8 +324,10 @@ const getSensorValues = (u) => {
       const n = m[1];
       const v = typeof sensorData.sensors[n] === 'object' ? sensorData.sensors[n]["value"] : undefined;
       if (typeof v !== 'undefined') {
+        //u = u.replace(m[0], v);
         u = u.replace(r, v);
       } else {
+        //u = u.replace(m[0], '');
         u = u.replace(r, '');
       }
     }
@@ -374,7 +403,7 @@ const buildWidgetHtml = (container, profile = 'desktop') => {
     }
   });
   const htmlEncoded = Utils.encodeHtml(html);
-  console.log(htmlEncoded)
+  //console.log(htmlEncoded)
   if (htmlEncoded !== widgetData) {
     stopUpdater();
     container.setAttribute(kWidgetData, htmlEncoded);
@@ -384,6 +413,7 @@ const buildWidgetHtml = (container, profile = 'desktop') => {
     }
     startUpdater();
     //enableDragging();
+    //checkTwitch();
   } else {
     console.log('No widget changes');
   }
