@@ -56,6 +56,11 @@ body {
   max-height: 1px;
 }
 
+.dragging {
+  border:1px inset #ff0000;
+  cursor: pointer;
+}
+
 #inner-container {
   position: absolute;
   overflow: auto;

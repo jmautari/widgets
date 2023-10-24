@@ -1,5 +1,6 @@
 import { config } from '../../js/config.js';
 import { setHostConfig, setScreen, setSensorData, createWidgets } from '../../js/widgets.js';
+import { setDraggable } from './dragndrop.js';
 
 let hostName;
 let port;
@@ -101,13 +102,19 @@ const showProps = (src, left, top, width, height, zIndex, url) => {
   setPos('y', top);
   setPos('w', width);
   setPos('h', height);
-  if (left < 20) left = 20;
-  if (top < 40) top = 40;
+  if (left < 0) left = 0;
+  top = src.offsetTop + src.offsetHeight + document.getElementById('header').offsetHeight;
+  console.log(`top=${top}`)
   o.style.left = `${left}px`;
   o.style.top = `${top}px`;
   o.style.display = 'block';
+  if (editElement) {
+    editElement.classList.remove('dragging');
+  }
   editElement = src;
+  editElement.classList.add('dragging');
   editElement.data = { src, url };
+  setDraggable(editElement);
 };
 const widgetClicked = (event) => {
   event.preventDefault();
@@ -272,6 +279,7 @@ const setViewport = () => {
   o.style.height = `${h}px`;
 };
 const screenChanged = () => {
+  closeProps();
   const o = document.getElementById('screen');
   if (o.selectedIndex < 1) return;
   document.getElementById('profile').selectedIndex = 0;
@@ -307,6 +315,7 @@ const saveProps = () => {
 const closeProps = () => {
   const o = document.getElementById('properties');
   o.style.display = 'none';
+  editElement = undefined;
 };
 const reconnect = () => {
   if (connect()) {
