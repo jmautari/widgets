@@ -11,9 +11,10 @@
   "license": "ISC",
   "dependencies": {
     "canvas": "^2.9.1",
+    "dotenv": "^16.3.1",
     "express": "^4.18.1",
-    "ws": "^8.5.0",
-    "json-query": "^2.2.2"
+    "json-query": "^2.2.2",
+    "ws": "^8.5.0"
   },
   "devDependencies": {
     "nodemon": "^2.0.16"

@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const fs = require('fs');
 const ws = require('ws');
@@ -15,7 +16,7 @@ const kDefaultJsonFile = 'widgets_default.json';
 const kListFile = 'widgets_list.json';
 const kDotFile = '1x1.png';
 const kSensorsFile = 'sensors.json';
-const kRootDir = process.env.PW_ROOT || 'd:/backgrounds';
+const kRootDir = process.env.PW_ROOT || 'c:/backgrounds';
 const kCacheTime = 31557600;
 const kPlaySoundProgram = kRootDir + '/playsound.exe';
 const kSensorsProgram = kRootDir + '/widget-sensors.exe';
@@ -65,7 +66,7 @@ class ServerState {
 const serverState = new ServerState();
 this._opts = {
   sensors_file: false,
-  sensors_socket: 'localhost',
+  sensors_socket: process.env.PW_SOCKET || 'mr-pc',
   port: 30001
 };
 
@@ -799,8 +800,8 @@ app.get('/img', (req, res) => {
   const sensor = req.query.sensor ? req.query.sensor.split(',') : [];
   let x = 1;
   sensor.forEach(i => {
-    if (typeof this._sensorData === 'object') {
-      let val = this._sensorData.sensors[i][value] || 'false';
+    if (typeof serverState._sensorData === 'object') {
+      let val = serverState._sensorData.sensors[i][value] || 'false';
       if (typeof val !== 'undefined') {
         const s = '$' + x;
         uri = uri.replace(s, val);
@@ -808,9 +809,12 @@ app.get('/img', (req, res) => {
     }
   });
   const file = kRootDir + '/' + uri;
+  //console.log(file);
   if (fs.existsSync(file)) {
     res.setHeader('Cache-Control', 'no-store');
     res.sendFile(file);
+  } else {
+    res.status = 404;
   }
 });
 app.get('/sensors', (req, res) => {
