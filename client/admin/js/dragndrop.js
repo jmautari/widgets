@@ -1,28 +1,11 @@
-'use strict';
-
 var offset = [0,0];
 var divOverlay;
 var isDown = false;
 var currentId;
 
-const enableDragging = () => {
-  const dragabble = document.getElementsByClassName("dragabble");
-  for (let i = 0; i < dragabble.length; i++) {
-    setDraggable(dragabble[i].id);
-  }
-};
 const mouseDown = (e) => {
   divOverlay = e.eventTarget || e.target;
   startDrag(divOverlay, e);
-};
-const setDraggable = (id) => {
-  const o = document.getElementById(id);
-  if (typeof o === 'undefined') {
-    console.log('Invalid object');
-    return;
-  }
-
-  o.addEventListener('mousedown', mouseDown, true);
 };
 const startDrag = (o, e) => {
   isDown = true;
@@ -34,6 +17,12 @@ const startDrag = (o, e) => {
   divOverlay.style.background = 'mediumblue';
   divOverlay.style.cursor = 'grab';
 };
+export function setDraggable(elem) {
+  if (!elem.hasEventListener) {
+    elem.hasEventListener = true;
+    elem.addEventListener('mousedown', mouseDown, true);
+  }
+}
 
 document.addEventListener('mouseup', (e) => {
   if (isDown) {
@@ -41,7 +30,7 @@ document.addEventListener('mouseup', (e) => {
     console.log('stopping dragging of', divOverlay.id);
     divOverlay.style.background = 'transparent';
     divOverlay.style.cursor = 'inherit';
-    saveElementPos();
+    console.log('End drag');
     divOverlay = undefined;
   }
 }, true);
@@ -54,6 +43,7 @@ document.addEventListener('mousemove', (e) => {
   }
 }, true);
 
+/*
 document.addEventListener('keydown', (e) => {
   if (e.repeat) return;
   if (e.ctrlKey && (e.keyCode === 65 || e.keyCode === 97)) {  // CTRL+A
@@ -69,14 +59,4 @@ document.addEventListener('keydown', (e) => {
     return false;
   }
 });
-
-/*
-const bootStrap = (onloadCB) => {
-  let head = document.head;
-  let script = document.createElement('script');
-  script.type = 'text/javascript';
-  script.src = '/js/config.js';
-  script.onload = onloadCB;
-  head.appendChild(script);
-};
 */

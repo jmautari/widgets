@@ -1,0 +1,52 @@
+<!doctype html>
+
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="Page Watch editor">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title></title>
+  <link rel="stylesheet" href="/css/main.css?v=2">
+  <script src="/js/utils.js"></script>
+  <script src="js/editor.js" type="module"></script>
+</head>
+
+<body>
+  <div id="container">
+    <div id="header">
+      <span>Viewport</span>
+      <span>W:</span>
+      <input type="text" size="4" id="width" />
+      <span>H:</span>
+      <input type="text" size="4" id="height" />
+      <button id="set_viewport">Set Viewport</button>
+      <span>&nbsp;&nbsp;&nbsp;</span>
+      <select id="files"></select>
+      <button id="load">Load</button>
+      <button id="save">Save</button>
+      <button id="save_as">Save as...</button>
+      <select id="screen"></select>
+      <select id="profile"><option value="desktop">desktop</option><option value="game">game</option></select>
+    </div>
+    <div id="inner-container">
+      <div id="viewport" spellcheck="false" widget-data=""></div>
+    </div>
+  </div>
+  <div id="properties">
+    <span>X:</span><input type="text" id="x" class="pos" value="0px" /><br />
+    <span>Y:</span><input type="text" id="y" class="pos" value="0px" /><br />
+    <span>W:</span><input type="text" id="w" class="pos" value="0px" /><br />
+    <span>H:</span><input type="text" id="h" class="pos" value="0px" /><br />
+    <span>Z:</span><input type="text" id="z" class="pos" value="0" /><br />
+    <br />
+    <button id="save_props">Save</button>
+    &nbsp;
+    <button id="close_props">Close</button>
+  </div>
+</body>
+
+</html>

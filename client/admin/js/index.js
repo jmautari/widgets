@@ -1,4 +1,5 @@
-'use strict';
+import { config } from '../../js/config.js';
+import { setHostConfig, setScreen, setSensorData, createWidgets } from '../../js/widgets.js';
 
 let hostName;
 let port;
@@ -169,16 +170,15 @@ const start = () => {
   clearTimer();
   reconnectTimer = window.setInterval(reconnect, kRetryIntervalMs);
 };
-bootLoader(() => {
-  hostName = config.host || 'mr-pc';
-  port = config.port || 30000;
-  host = hostName + ':' + port;
-  websocketUrl = 'ws://' + host;
+hostName = config.host || 'mr-pc';
+port = config.port || 30000;
+host = hostName + ':' + port;
+websocketUrl = 'ws://' + host;
 
-  document.getElementById('files').addEventListener('change', filesChanged);
-  document.getElementById('activate').addEventListener('click', activateFile);
-  document.getElementById('save').addEventListener('click', saveJson);
-  document.getElementById('save_as').addEventListener('click', saveJsonAs);
+document.getElementById('files').addEventListener('change', filesChanged);
+document.getElementById('activate').addEventListener('click', activateFile);
+document.getElementById('save').addEventListener('click', saveJson);
+document.getElementById('save_as').addEventListener('click', saveJsonAs);
 
-  start();
-});
+setHostConfig(config);
+start();
